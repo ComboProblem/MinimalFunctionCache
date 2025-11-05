@@ -10,37 +10,30 @@ solver_mode_default = "full"
 row_processing_order_default = "lex"
 cut_scoring_method_default = "scip_default"
 
+class UnsetData(Exception):
+    pass
+
+class ParamaterizationError(Exception):
+    pass
 
 class abstractCutScore:
     r"""
     Class factory for cut optimization objective functions, aka cut scoring metrics. 
     """
     @classmethod
-    def __init__(cls, name, MIP_objective, MIP_row, sage_to_solver_type):
-        cls._name = name
-        cls._MIP_objective = MIP_objective
-        cls._MIP_row = MIP_row
-        cls._sage_to_solver_type =  sage_to_solver_type
+    def __init__(cls, **kwrds):
+        pass
 
     @abstractmethod
-    def cut_score(cls, cut):
+    def cut_score(cls, cut, field=None):
         r"""
-        Assume cut is a list of sage rationals. 
-        
-        The call function here is to evaluate the current parameterized cut to in the cutGenerationSolver.  
-        The cut as the form \sum_{j\in N} pi(bar(a_ij))^Tx_j= \sum_{j\in N} pi_p(bar(a_ij))x_j \geq 1 = \pi_p(bar(b_i))= pi_p(lambda_findex) = 1.
-        We have the  constraint lambda_findex = b_i on pi Min assumed to be holding at this point. 
-        B corrosponds to the basis in a current LP relaxation basis of MIP.
-        N is the non basic variables of the LP relaxation. 
-        This is where the cut scoring method (which is assumed to be fixed relative to a fixed objective function of the MIP)
-        The particular cut scoring method should overwrite the call function and replace it with assuming that cut is a list like object 
-        representing the cut. cutGenSolver is responsible for translating types to solver compaitable types. 
+        Assume cut is a list like object of elements of the given field (by default QQ). 
+        Cut is assumed to be the intersection cut generated from some minimal function. 
+        In particular, we are assuming that has the form \sum_{j\in N} pi(bar(a_ij))^Tx_j 
+        = \sum_{j\in N} pi_p(bar(a_ij))x_j \geq 1 = \pi_p(bar(b_i))= pi_p(lambda_findex) = 1.
+        I.e. (0, pi)(x_B,x_N) \geq 1.
         """
         raise NotImplementedError
-    
-    @classmethod
-    def name(cls):
-        return cls._name
 
     @classmethod
     def set_MIP_objective(cls, new_objective):
@@ -77,13 +70,27 @@ class CutScore:
         if issubclass(name, abstractCutScore):
             return super().__classcall__(cls, cut_score=name, **kwrds)
         else:
-            raise TypeError("BOO")
+            raise TypeError("name a valid cut score or ")
 
     def __init__(self, cut_score, **kwrds):
+        r"""
+        Initalize the cut scoring function without any data from the MIP. 
+        """
         self._cut_score = cut_score(**kwrds)
         super().__init__()
+        self._MIP_objective = None
+        self._MIP_row = None
+        self._sage_to_solver_type =  None
     
     def __call__(self, parameters):
+        r"""
+        parameters is a list like object with even length of at most 2k.
+        parameters = (bkpt, val) represents a parameterize element of Pimin<=k, i.e. a point in RR^{2n} such that
+        the first n elements are the breakpoints, and the remainder of the values of the list are the values
+        of the parameterized function, pi_(bkpt,val) \in Pimin<=k.
+        
+        It is assumed parameters is satisfied the assumptions stated. No errors will be raised. 
+        """
         # parameters is and element of B\times V \se R^2n
         # we assume parameters are of the solver type.
         # we preform the composition of maps which takes us from the parameter space to
@@ -92,6 +99,12 @@ class CutScore:
         # constructions of parametric functions.
         # then convert the output to the correct solver type finishing the composition of 
         # maps. 
+        if self._MIP_objective is None:
+            raise UnsetData("Set MIP_objective before use of CutScore.")
+        if self._MIP_row is None:
+            raise UnsetData("Set MIP_row before use of CutScore.")
+        if self._sage_to_solver_type is None:
+            raise UnsetData("Set sage_to_solver_type before use of CutScore.")
         bkpt = [QQ(b) for b in parameters[:len(parameters)/2]]
         val = [QQ(v) for v in parameters[len(parameters)/2:]]
         pi = piecewiese_function_from_bkpts_and_values(bkpt + [1], val + [0])
@@ -100,6 +113,19 @@ class CutScore:
         result = self.get_sage_to_solver_type()(self._cut_score.cut_score(cut))
         return result    
 
+class Parallelism(abstractCutScore):
+    """
+    Normalized cut parallelism. 
+    """
+    def cut_score(cls, cut, field=None):
+        obj_norm = norm(cls._MIP_objective)
+        cut_norm = norm(cut)
+        dot_product = dot_product(cls._MIP_objective, cut)
+        return dot_product/(obj_norm*cut_norm)
+        
+    def cut_obj_type(cls):
+        cls._obj_type = "maximization" # close the value is to 1, the more parallel the cut is to the objective. 
+        
 
 class cutGenerationDomain:
     r"""PiMin<=k, possibly with paramaterized constraints.
@@ -140,9 +166,18 @@ class cutGenerationDomain:
             cells = self._PiMin.get_semialgebraic_sets()
         else:
             cell = None
-        for bkpt in Subsets(self.possible_bkpt_params, self._num_bkpts):
+        for bkpt in Subsets(self.possible_bkpt_params):
             for f_index in range(1, self._num_bkpts)
                 yield generate_cell_slice_from_bkpt_params(bkpt, f_index)
+    
+    def specify_f(self, f):
+        """
+        Assumes all elements in the cutGenerationDomain satisfy the condition that pi(f) = 1.
+        """
+        self._f = f 
+    
+    def current_f(self):
+        return self._f
 
     # def get_manifold(self): #To do, once I write manifold methods. 
         # raise NotImplementedError
@@ -167,7 +202,7 @@ class cutGenerationDomain:
 
     def generate_cell_slice_from_bkpt_params(self, bkpt, f_index):
         assert(len(bkpt) ==  self._num_bkpts)
-        return value_nnc_polyhedron(bkpt, f_index) #write a verison which includes makes a consistent number of parameters. 
+        return value_nnc_polyhedron(bkpt, f_index) #write a version which includes makes a consistent number of parameters. 
 
 
 class cutGenerationSolverBase:
@@ -177,23 +212,48 @@ class cutGenerationSolverBase:
     The solve and __init__ methods are written to be compatiable with the cut generation problem  and provide an optimal solution to the problem 
     provided that the solver and data conversion methods have been written. 
     """
-    def __init__(self, cut_gen_domain, cut_score)):
+    def __init__(self, cut_gen_domain, cut_score, cut_problem_options, **solver_options):
         if not isinstance(cut_gen_domain, cutGenerationDomain):
             raise ValueError("cut_gen_domain is required to be an instance of cutGenerationDomain")
         if not isinstance(cut_score, cutScoreBase):
             raise ValueError("cut_score is requried to be an instance of cutScoreBase")
         self._cut_gen_domain = cut_gen_domain
         self._cut_score = cut_score
-        
+        self._cut_score.set_sage_to_solver_type(self.sage_to_solver_type)
 
-    def solve(self, MIP, **options):
-        r"""Solves the paramaterized problem options are options to be passed into the solver. 
+    def solve(self, MIP, min_or_max, **solver_options):
+        r"""Solves the paramaterized problem 
+        
+        min/max cutScore s.t. 
+        options are options to be passed into the solver. 
         """
+        # for now assuming problem is in the form of min 
+        current_domain_obj_val = inf
+        domain_problem_solution = None
+        
+        # ADD Options to which row get solved in the MIP.relaxed_basis()
+        for fractional_row in MIP.relaxed_basis():
+            self._cut_score.set_MIP_row(fractional_row)
+            f_constraint = "fractional_row[b_i] == f"
+            val_constraint =  "pi(f) == 1"
+            self._cut_gen_domain.specify_f(fractional_row[b_i]) #replace with actually BSA constraint.
+
+### solve problem for a set row. 
         for subdomain in self._cut_gen_domain.get_cells():
+            objective_fun = self._cut_score # the call method here is a function from R^{2n} (parameter space) to R
             if subdomain.is_linear() #reprlace with correct BSA command:
                 subdomain_solver_constraints = self.write_linear_constraints_from_bsa_for_solver(subdomain)
-                objective_fun = self._cut_score # the call method here is a function from R^{2n} (parameter space) to R
-        pass
+                subdomain_problem_val, subdomain_problem_solution = self.solver_linear_solve(subdomain_solver_constraints, objective_fun, min_or_max, **solver_options)
+            else: # non-linear case
+                subdomain_solver_constraints = self.write_nonlinear_constraints_from_bsa_for_solver(subdomain)
+                subdomain_problem_val, subdomain_problem_solution = self.solver_nonlinear_solve(subdomain_solver_constraints, objective_fun, min_or_max, **solver_options)                
+            if subdomain_problem_val < current_domain_obj_val:
+                current_domain_obj_val = subdomain_problem_val
+                domain_problem_solution = subdomain_problem_solution
+        result = {}
+        result["objective_value"] = current_domain_obj_val
+        result["parameterized_solution"] = domain_problem_solution
+        return result
 
     @staticmethod
     def write_linear_constraints_from_bsa_for_solver(bsa): # think about aspects of exactness; 
@@ -202,6 +262,7 @@ class cutGenerationSolverBase:
         """
         raise NotImplementedError
 
+    @staticmethod
     def write_nonlinear_constraints_from_bsa(self, bsa):
         r"""
         Given a BSA with non linear constraints, converts the bsa object into a format that the underlying solver can use.
@@ -211,19 +272,28 @@ class cutGenerationSolverBase:
     # def write_manifold_constraints(self, manifold):
         # pass
 
-    def solver_linear_solve(self, constraints, objective, min_or_max,  **options):
+    @staticmethod
+    def solver_linear_solve(self, constraints, objective, min_or_max,  **solver_options):
         r"""
         Interface to solver's min/max f(x) s.t. Ax<=b. 
+        
+        Should return optimal objective value, optimal objective solution.
         """
         raise NotImplementedError
 
-    def solver_nonlinear_solve(self, constraints, objective, **options):
+    @staticmehtod
+    def solver_nonlinear_solve(self, constraints, objective, min_or_max, **solver_options):
         r"""
-        Interface to solver's min/max f(x) s.t. p_i(x) <= b_i, where p_i is a polymomial and at least 1 p_i has degree larger than 1.  
+        Interface to solver's min/max f(x) s.t. p_i(x) <= b_i, where p_i is a polynomial and at least 1 p_i has degree larger than 1.  
         """
         raise NotImplementedError
-    def sage_to_solver_type(self, cut):
+
+
+    @staticmethod
+    def sage_to_solver_type(self, sage_rational):
         raise NotImplementedError
+        
+    def cut_from_parameter_data(self, row_data, 
     
     
 
