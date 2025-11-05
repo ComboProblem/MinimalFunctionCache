@@ -10,15 +10,56 @@ solver_mode_default = "full"
 row_processing_order_default = "lex"
 cut_scoring_method_default = "scip_default"
 
-class cutScoreBase:
+
+class abstractCutScore:
     r"""
-    Abstract base class for cut optimization objective functions, aka cut scoring metrics. 
+    Class factory for cut optimization objective functions, aka cut scoring metrics. 
     """
-    def __init__(self, MIP_objective):
-        pass
-    def __call__(self, cut):
+    @classmethod
+    def __init__(cls, name, MIP, cutGenSolver):
+        cls._name = name
+        cls._MIP = MIP # result of SCIP Data; Let's not abstract away this part just yet. 
+        cls._cutGenSolver = cutGenSolver
         
         pass
+    @classmethod
+    def __call__(cls, cut):
+        r"""The call function here is to evaluate the current parameterized cut to in the cutGenerationSolver.  
+        The cut as the form \sum_{j\in N} pi(bar(a_ij))^Tx_j= \sum_{j\in N} pi_p(bar(a_ij))x_j \geq 1 = \pi_p(bar(b_i))= pi_p(lambda_findex) = 1.
+        We have the  constraint lambda_findex = b_i on pi Min assumed to be holding at this point. 
+        B corrosponds to the basis in a current LP relaxation basis of MIP.
+        N is the non basic variables of the LP relaxation. 
+        This is where the cut scoring method (which is assumed to be fixed relative to a fixed objective function of the MIP)
+        The particular cut scoring method should overwrite the call function and replace it with assuming that cut is a list like object 
+        representing the cut. cutGenSolver is responsible for translating types to solver compaitable types. 
+        """
+        raise NotImplementedError
+    
+    @classmethod
+    def name(cls):
+        return cls._name
+        
+    @classmethod
+    def set_MIP_objective(cls, new_objective):
+        cls._MIP_objective = new_objective
+
+    @classmethod
+    def get_MIP_objective(cls):
+        return cls._MIP_objective
+
+class CutScore:
+    @staticmethod
+    def __classcall__(cls, name=None, **kwrds):
+        r"""
+
+        """
+        if name == "parallelism" or name is None:
+            return super().__classcall__(cls, cut_score=Parallelism)
+        if issubclass(name, AbstractSimplexMethodPivotRule):
+            return super().__classcall__(cls, pivot_rule=name, **kwrds)
+        else:
+            raise TypeError("BOO")
+
 
 
 class cutGenerationDomain:
@@ -101,14 +142,22 @@ class cutGenerationSolverBase:
         if not isinstance(cut_gen_domain, cutGenerationDomain):
             raise ValueError("cut_gen_domain is required to be an instance of cutGenerationDomain")
         if not isinstance(cut_score, cutScoreBase):
-            
+            raise ValueError("cut_score is requried to be an instance of cutScoreBase")
+        self._cut_gen_domain = cut_gen_domain
+        self._cut_score = cut_score
+        
 
-    def solve(self, **options):
-        r"""Solves the problem options are options to be passed into the solver. 
+    def solve(self, MIP, **options):
+        r"""Solves the paramaterized problem options are options to be passed into the solver. 
         """
+        for subdomain in self._cut_gen_domain.get_cells():
+            if subdomain.is_linear() #reprlace with correct BSA command:
+                subdomain_solver_constraints = self.write_linear_constraints_from_bsa_for_solver(subdomain)
+                
         pass
 
-    def write_linear_constraints_from_bsa_for_solver(self, bsa): # think about aspects of exactness; 
+    @staticmethod
+    def write_linear_constraints_from_bsa_for_solver(bsa): # think about aspects of exactness; 
         r"""
         Given a BSA with only linear constraints, converts the bsa object into a format that the underlying solver can use.
         """
@@ -131,7 +180,10 @@ class cutGenerationSolverBase:
 
     def solver_nonlinear_solve(self, constraints, objective, **options):
         raise NotImplementedError
- 
+    def cut_to_solver(self, cut):
+        raise NotImplementedError
+    
+    
 
 class cutGenerationProblem:
     r"""
@@ -155,6 +207,5 @@ class cutGenerationProblem:
         pass
         
 
-
-
+# 100 percent using SCIP
 
