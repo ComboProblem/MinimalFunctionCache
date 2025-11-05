@@ -11,21 +11,23 @@ row_processing_order_default = "lex"
 cut_scoring_method_default = "scip_default"
 
 
-
 class abstractCutScore:
     r"""
     Class factory for cut optimization objective functions, aka cut scoring metrics. 
     """
     @classmethod
-    def __init__(cls, name, MIP, cutGenSolver):
+    def __init__(cls, name, MIP_objective, MIP_row, sage_to_solver_type):
         cls._name = name
-        cls._MIP = MIP # result of SCIP Data; Let's not abstract away this part just yet. 
-        cls._cutGenSolver = cutGenSolver
+        cls._MIP_objective = MIP_objective
+        cls._MIP_row = MIP_row
+        cls._sage_to_solver_type =  sage_to_solver_type
+
+    @abstractmethod
+    def cut_score(cls, cut):
+        r"""
+        Assume cut is a list of sage rationals. 
         
-        pass
-    @classmethod
-    def __call__(cls, cgf, row_data):
-        r"""The call function here is to evaluate the current parameterized cut to in the cutGenerationSolver.  
+        The call function here is to evaluate the current parameterized cut to in the cutGenerationSolver.  
         The cut as the form \sum_{j\in N} pi(bar(a_ij))^Tx_j= \sum_{j\in N} pi_p(bar(a_ij))x_j \geq 1 = \pi_p(bar(b_i))= pi_p(lambda_findex) = 1.
         We have the  constraint lambda_findex = b_i on pi Min assumed to be holding at this point. 
         B corrosponds to the basis in a current LP relaxation basis of MIP.
@@ -34,14 +36,35 @@ class abstractCutScore:
         The particular cut scoring method should overwrite the call function and replace it with assuming that cut is a list like object 
         representing the cut. cutGenSolver is responsible for translating types to solver compaitable types. 
         """
-        cut = []
-        for item in row_data:
-            cut_data.append(cgf[item])
-        return cut
+        raise NotImplementedError
     
     @classmethod
     def name(cls):
         return cls._name
+
+    @classmethod
+    def set_MIP_objective(cls, new_objective):
+        cls._MIP_objective = new_objective
+
+    @classmethod
+    def get_MIP_objective(cls):
+        return cls._MIP_objective
+
+    @classmethod
+    def get_MIP_row(cls):
+        return cls._MIP_row
+
+    @classmethod
+    def set_MIP_row(cls, new_row):
+        cls._MIP_row = new_row
+
+    @classmethod
+    def get_sage_to_solver_type(cls):
+        return cls._sage_to_solver_type
+
+    @classmethod
+    def set_sage_to_solver_type(cls, new_conversion):
+        cls.__sage_to_solver_type = new_conversion
 
 class CutScore:
     @staticmethod
@@ -55,9 +78,27 @@ class CutScore:
             return super().__classcall__(cls, cut_score=name, **kwrds)
         else:
             raise TypeError("BOO")
-def __init__(self, **kwrds):
-    pass 
-# def __call__(self, cut)
+
+    def __init__(self, cut_score, **kwrds):
+        self._cut_score = cut_score(**kwrds)
+        super().__init__()
+    
+    def __call__(self, parameters):
+        # parameters is and element of B\times V \se R^2n
+        # we assume parameters are of the solver type.
+        # we preform the composition of maps which takes us from the parameter space to
+        # minimal funciton space. 
+        # Internally, we use exact rational arithmetic as that is what works for the exact
+        # constructions of parametric functions.
+        # then convert the output to the correct solver type finishing the composition of 
+        # maps. 
+        bkpt = [QQ(b) for b in parameters[:len(parameters)/2]]
+        val = [QQ(v) for v in parameters[len(parameters)/2:]]
+        pi = piecewiese_function_from_bkpts_and_values(bkpt + [1], val + [0])
+        row_data =  self._cut_score.get_MIP_row()
+        cut = [pi(QQ(bar_a_ij)) for bar_a_ij in row_data]
+        result = self.get_sage_to_solver_type()(self._cut_score.cut_score(cut))
+        return result    
 
 
 class cutGenerationDomain:
@@ -148,11 +189,10 @@ class cutGenerationSolverBase:
     def solve(self, MIP, **options):
         r"""Solves the paramaterized problem options are options to be passed into the solver. 
         """
-        # semantic rema
         for subdomain in self._cut_gen_domain.get_cells():
             if subdomain.is_linear() #reprlace with correct BSA command:
                 subdomain_solver_constraints = self.write_linear_constraints_from_bsa_for_solver(subdomain)
-                cutProblemObjective = cutScore(  cgf, MIP.row))
+                objective_fun = self._cut_score # the call method here is a function from R^{2n} (parameter space) to R
         pass
 
     @staticmethod
@@ -173,13 +213,16 @@ class cutGenerationSolverBase:
 
     def solver_linear_solve(self, constraints, objective, min_or_max,  **options):
         r"""
-        Interface to solver's solve method. Should output an optimal value and point to the problem min/max c^Tx s.t. Ax <= b. 
+        Interface to solver's min/max f(x) s.t. Ax<=b. 
         """
         raise NotImplementedError
 
     def solver_nonlinear_solve(self, constraints, objective, **options):
+        r"""
+        Interface to solver's min/max f(x) s.t. p_i(x) <= b_i, where p_i is a polymomial and at least 1 p_i has degree larger than 1.  
+        """
         raise NotImplementedError
-    def cut_to_solver(self, cut):
+    def sage_to_solver_type(self, cut):
         raise NotImplementedError
     
     
@@ -207,4 +250,3 @@ class cutGenerationProblem:
         
 
 # 100 percent using SCIP
-
