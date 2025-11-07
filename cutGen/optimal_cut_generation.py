@@ -3,12 +3,11 @@ from minimalfunctioncache import sys_info
 from scipy.optimize import minimize, LinearConstraint, NonlinearConstraint
 # sys_info is an object that contains knows how to read data from the minimal function cache.
 
-
 # current defaults
 max_bkpts = sys_info.max_bkpts
 solver_mode_default = "full"
 row_processing_order_default = "lex"
-cut_scoring_method_default = "scip_default"
+cut_scoring_method_default = "parallelism"
 
 class UnsetData(Exception):
     pass
@@ -32,6 +31,8 @@ class abstractCutScore:
         In particular, we are assuming that has the form \sum_{j\in N} pi(bar(a_ij))^Tx_j 
         = \sum_{j\in N} pi_p(bar(a_ij))x_j \geq 1 = \pi_p(bar(b_i))= pi_p(lambda_findex) = 1.
         I.e. (0, pi)(x_B,x_N) \geq 1.
+        
+        Output of cut_score should be an element of the specified field (or should allow sage to coherse the elements). 
         """
         raise NotImplementedError
 
@@ -59,6 +60,10 @@ class abstractCutScore:
     def set_sage_to_solver_type(cls, new_conversion):
         cls.__sage_to_solver_type = new_conversion
 
+    @classmethod
+    def cut_obj_type(cls)
+         cls._cut_obj_type
+
 class CutScore:
     @staticmethod
     def __classcall__(cls, name=None, **kwrds):
@@ -74,13 +79,17 @@ class CutScore:
 
     def __init__(self, cut_score, **kwrds):
         r"""
-        Initalize the cut scoring function without any data from the MIP. 
+        Initialize the cut scoring function. 
+        
+        MIP data, type conversion method, and objective type, can be specified in initialization or modified
+        with with get and set methods. 
         """
         self._cut_score = cut_score(**kwrds)
         super().__init__()
         self._MIP_objective = None
         self._MIP_row = None
-        self._sage_to_solver_type =  None
+        self._sage_to_solver_type = None
+        self._obj_type = None
     
     def __call__(self, parameters):
         r"""
@@ -115,23 +124,26 @@ class CutScore:
 
 class Parallelism(abstractCutScore):
     """
-    Normalized cut parallelism. 
+    Normalized cut parallelism score.
     """
     def cut_score(cls, cut, field=None):
-        obj_norm = norm(cls._MIP_objective)
-        cut_norm = norm(cut)
-        dot_product = dot_product(cls._MIP_objective, cut)
-        return dot_product/(obj_norm*cut_norm)
+        obj_norm = vector(cls._MIP_objective).norm()
+        cut_norm = vector(cut).norm()
+        dot_product = vector(cls._MIP_objective).row()*vector(cut).column()
+        return dot_product[0]/(obj_norm*cut_norm)
         
-    def cut_obj_type(cls):
-        cls._obj_type = "maximization" # close the value is to 1, the more parallel the cut is to the objective. 
+class SteepestDirection(abstractCutScore)
+    """
+    Steepest direction score. 
+    """
+    def cut_score(cls, cut, field=None):
+        dot_product = vector(cls._MIP_objective).row()*vector(cut).column()
+        return dot_product[0]
         
 
 class cutGenerationDomain:
     r"""PiMin<=k, possibly with paramaterized constraints.
    
-    constraints is an interable of BSA objects
-    get_cells is the indeded call method. Should allow users to 
     """
     def __init__(self, k, possible_bkpt_params=[], constraints=[]):
         self._num_bkpts = k
@@ -195,7 +207,7 @@ class cutGenerationDomain:
         self._constraints.append(constraint) 
 
     def remove_constrain(self, constraint):
-        pass
+        self._constraints.pop(constraint)
 
     def add_possible_breakpoint_value(self, b):
         self._possible_bkpt_params.append(b)
@@ -290,16 +302,21 @@ class cutGenerationSolverBase:
 
 
     @staticmethod
-    def sage_to_solver_type(self, sage_rational):
+    def sage_to_solver_type(self, sage_field_element, field=None):
         raise NotImplementedError
-        
-    def cut_from_parameter_data(self, row_data, 
-    
     
 
 class cutGenerationProblem:
     r"""
-    Define the problem min cutScore(pi, MIP) s.t. pi in PiMin <=k
+    MIP has data c^Tx st. Ax<=b; x>=0; A is n times m; x is len m.  
+    Define the problem min cutScore(pi, MIP) s.t. pi in PiMin <=k. 
+    
+    Option: row selection: all_rows, lex rows, random row, subset (find optimal cut over fractional row(s))
+    Option: algorithm = full space; bkpt as param: full (all combinatorial data, if needed k<n-m),  max, lex (selects lexicographically first parameter data k< n-m), or rand (randomly select parameter data)
+    Option: num_bkpt = full space: k <= max_bkpts; bkpt as param: full, lex rand, k <= n-m; max, k = n-m
+    Option: cut_score = parallelism, steepestdirection, scip, or custom
+    Option: cut_gen_solver = scipy or custom
+    Option: multithread = not_implemented
     """
     def __init__(self, max_bkpts, cut_scoring_method, MIP, cut_domain, solver, **solving_parameters):
         self._status = None
