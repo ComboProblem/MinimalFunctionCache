@@ -1,8 +1,8 @@
 # Minimal Function Cache
 
-Minimal Funciotn Cache is an repository for a proposed cut and branch paradime proposed in the thesis of Acadia Larsen which uses an explicit method select optimal cuts over a space of valid intersection cuts for a given MIP relaxation basis. 
+Minimal Funciotn Cache is a repository for a proposed cut and branch paradime in the thesis of Acadia Larsen which uses an explicit method select optimal cuts over a space of valid intersection cuts for a given MIP relaxation basis. 
 
-## Included Software and Tools
+## Included Software, Tools, Documentation
 
 - Experimental Cut and Branch Solver using explicitly optimized cuts over the space of minimal functions with a finite number of breakpoints. 
 
@@ -11,15 +11,24 @@ Minimal Funciotn Cache is an repository for a proposed cut and branch paradime p
 - A cache of computed repersenative elements.
 
 - Reproducable computational experiments.
+  
+- Documentation: Customizable interfaces for the solver to various components.
+
+- Documentation: Mathematical framework.  
 
 # Goals and Non-Goals
 
 ## Goals
- - Reproducablity
- - Correcntness
- - Reabaility
- - Tested
+ - Illustrate concept of expicit optimal cut selection. 
+ - Reproducablity on local and HPC machines.
+ - Mathematical correcntness of cut generation.
 
 ## Non-goals
 
- - Preformance
+ - Preformance and code optimization; the cut generation technique presented is a proof of concept and is intended to function (for practical problem) with an excess of compute.
+
+# Installation
+
+## Single Machine
+
+## HPC
