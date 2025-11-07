@@ -17,7 +17,7 @@ class ParamaterizationError(Exception):
 
 class abstractCutScore:
     r"""
-    Class factory for cut optimization objective functions, aka cut scoring metrics. 
+    abstract class for cut optimization objective functions, aka cut scoring metrics. 
     """
     @classmethod
     def __init__(cls, **kwrds):
@@ -38,6 +38,11 @@ class abstractCutScore:
 
     @classmethod
     def set_MIP_objective(cls, new_objective):
+        """
+        Use reduced costs of the basis relaxation here. 
+
+        This should be a vector of length n-m for the problem. 
+        """
         cls._MIP_objective = new_objective
 
     @classmethod
@@ -46,6 +51,9 @@ class abstractCutScore:
 
     @classmethod
     def get_MIP_row(cls):
+        """
+        for fixed i,bar_i - (bar a_i)^T x_N 
+        """
         return cls._MIP_row
 
     @classmethod
@@ -53,25 +61,36 @@ class abstractCutScore:
         cls._MIP_row = new_row
 
     @classmethod
-    def get_sage_to_solver_type(cls):
+    def _get_sage_to_solver_type(cls):
+        """
+        Defined in the cutGenerationSolver. This method is only indeded to be set and unset by solving
+        routines in cutGenerationSolver. 
+        """
         return cls._sage_to_solver_type
 
     @classmethod
-    def set_sage_to_solver_type(cls, new_conversion):
+    def _set_sage_to_solver_type(cls, new_conversion):
         cls.__sage_to_solver_type = new_conversion
 
     @classmethod
-    def cut_obj_type(cls)
+    def cut_obj_type(cls):
          cls._cut_obj_type
 
-class CutScore:
+class cutScore:
+    """
+    cutScore is objective function used in the cutOptimzationProblem.
+
+    cutScore is fixed once data from the problem is fixed.
+    """
     @staticmethod
     def __classcall__(cls, name=None, **kwrds):
         r"""
-
+        input normalization of class
         """
         if name == "parallelism" or name is None:
             return super().__classcall__(cls, cut_score=Parallelism)
+        if name == "steepest_direction" or name is None:
+            return super().__classcall__(cls, cut_score=SteepestDirection)
         if issubclass(name, abstractCutScore):
             return super().__classcall__(cls, cut_score=name, **kwrds)
         else:
@@ -97,7 +116,7 @@ class CutScore:
         parameters = (bkpt, val) represents a parameterize element of Pimin<=k, i.e. a point in RR^{2n} such that
         the first n elements are the breakpoints, and the remainder of the values of the list are the values
         of the parameterized function, pi_(bkpt,val) \in Pimin<=k.
-        
+
         It is assumed parameters is satisfied the assumptions stated. No errors will be raised. 
         """
         # parameters is and element of B\times V \se R^2n
@@ -132,7 +151,7 @@ class Parallelism(abstractCutScore):
         dot_product = vector(cls._MIP_objective).row()*vector(cut).column()
         return dot_product[0]/(obj_norm*cut_norm)
         
-class SteepestDirection(abstractCutScore)
+class SteepestDirection(abstractCutScore):
     """
     Steepest direction score. 
     """
@@ -189,6 +208,9 @@ class cutGenerationDomain:
         self._f = f 
     
     def current_f(self):
+        """
+        Reports the value of f such that pi(f) = 1 for all elements of cutGenerationDomain.
+        """
         return self._f
 
     # def get_manifold(self): #To do, once I write manifold methods. 
@@ -214,7 +236,7 @@ class cutGenerationDomain:
 
     def generate_cell_slice_from_bkpt_params(self, bkpt, f_index):
         assert(len(bkpt) ==  self._num_bkpts)
-        return value_nnc_polyhedron(bkpt, f_index) #write a version which includes makes a consistent number of parameters. 
+        return value_nnc_polyhedron(bkpt, f_index) # write a version which includes makes a consistent number of parameters. 
 
 
 class cutGenerationSolverBase:
@@ -224,7 +246,7 @@ class cutGenerationSolverBase:
     The solve and __init__ methods are written to be compatiable with the cut generation problem  and provide an optimal solution to the problem 
     provided that the solver and data conversion methods have been written. 
     """
-    def __init__(self, cut_gen_domain, cut_score, cut_problem_options, **solver_options):
+    def __init__(self, cut_gen_domain, cut_score, algorithm, row_selection, multithread=False, **solver_options):
         if not isinstance(cut_gen_domain, cutGenerationDomain):
             raise ValueError("cut_gen_domain is required to be an instance of cutGenerationDomain")
         if not isinstance(cut_score, cutScoreBase):
@@ -281,6 +303,11 @@ class cutGenerationSolverBase:
         """
         raise NotImplementedError
 
+    def _algorithm_full_space(self):
+        pass
+
+    def _algorithm_bkpt_as_param(self, bkpt_choice):
+        pass
     # def write_manifold_constraints(self, manifold):
         # pass
 
