@@ -1,10 +1,11 @@
 from cutgeneratingfunctionology.igp import *
-from minimalfunctioncache import sys_info
+from minimalfunctioncache.system import sys_info
 from scipy.optimize import minimize, LinearConstraint, NonlinearConstraint
 # sys_info is an object that contains knows how to read data from the minimal function cache.
 
 # current defaults
 max_bkpts = sys_info.max_bkpts
+tol = sys_info.global_default_tol
 solver_mode_default = "full"
 row_processing_order_default = "lex"
 cut_scoring_method_default = "parallelism"
@@ -23,7 +24,6 @@ class abstractCutScore:
     def __init__(cls, **kwrds):
         pass
 
-    @abstractmethod
     def cut_score(cls, cut, field=None):
         r"""
         Assume cut is a list like object of elements of the given field (by default QQ). 
@@ -35,46 +35,6 @@ class abstractCutScore:
         Output of cut_score should be an element of the specified field (or should allow sage to coherse the elements). 
         """
         raise NotImplementedError
-
-    @classmethod
-    def set_MIP_objective(cls, new_objective):
-        """
-        Use reduced costs of the basis relaxation here. 
-
-        This should be a vector of length n-m for the problem. 
-        """
-        cls._MIP_objective = new_objective
-
-    @classmethod
-    def get_MIP_objective(cls):
-        return cls._MIP_objective
-
-    @classmethod
-    def get_MIP_row(cls):
-        """
-        for fixed i,bar_i - (bar a_i)^T x_N 
-        """
-        return cls._MIP_row
-
-    @classmethod
-    def set_MIP_row(cls, new_row):
-        cls._MIP_row = new_row
-
-    @classmethod
-    def _get_sage_to_solver_type(cls):
-        """
-        Defined in the cutGenerationSolver. This method is only indeded to be set and unset by solving
-        routines in cutGenerationSolver. 
-        """
-        return cls._sage_to_solver_type
-
-    @classmethod
-    def _set_sage_to_solver_type(cls, new_conversion):
-        cls.__sage_to_solver_type = new_conversion
-
-    @classmethod
-    def cut_obj_type(cls):
-         cls._cut_obj_type
 
 class cutScore:
     """
@@ -94,21 +54,25 @@ class cutScore:
         if issubclass(name, abstractCutScore):
             return super().__classcall__(cls, cut_score=name, **kwrds)
         else:
-            raise TypeError("name a valid cut score or ")
+            raise TypeError("Use a predefined cut scoring method or use custom instance of abstractCutScore.")
 
     def __init__(self, cut_score, **kwrds):
         r"""
-        Initialize the cut scoring function. 
+        Initialize the paramatrized cut scoring function. 
         
-        MIP data, type conversion method, and objective type, can be specified in initialization or modified
-        with with get and set methods. 
+        Maximization or minimlzation should be specified upon initlization.
+        
+        Data used with cutScore is managed by cutGenerationSolverBase.
         """
         self._cut_score = cut_score(**kwrds)
         super().__init__()
         self._MIP_objective = None
         self._MIP_row = None
         self._sage_to_solver_type = None
-        self._obj_type = None
+        if "obj_type" in kwrds.keys():
+            self._cut_obj_type = kwrds.keys()["obj_type"]
+        else:
+            self._cut_obj_type = "max"
     
     def __call__(self, parameters):
         r"""
@@ -139,7 +103,40 @@ class cutScore:
         row_data =  self._cut_score.get_MIP_row()
         cut = [pi(QQ(bar_a_ij)) for bar_a_ij in row_data]
         result = self.get_sage_to_solver_type()(self._cut_score.cut_score(cut))
-        return result    
+        return result
+
+    def set_MIP_objective(self, new_objective):
+        """
+        Use reduced costs of the basis relaxation here. 
+
+        This should be a vector of length n-m for the problem. 
+        """
+        self._MIP_objective = new_objective
+
+    def get_MIP_objective(self):
+        return self._MIP_objective
+
+    def get_MIP_row(self):
+        """
+        for fixed i,bar_i - (bar a_i)^T x_N 
+        """
+        return self._MIP_row
+
+    def set_MIP_row(self, new_row):
+        self._MIP_row = new_row
+
+    def _get_sage_to_solver_type(self):
+        """
+        Defined in the cutGenerationSolver. This method is only indeded to be set and unset by solving
+        routines in cutGenerationSolver. 
+        """
+        return self._sage_to_solver_type
+
+    def _set_sage_to_solver_type(self, new_conversion):
+        self.__sage_to_solver_type = new_conversion
+
+    def cut_obj_type(self):
+         self._cut_obj_type
 
 class Parallelism(abstractCutScore):
     """
@@ -162,26 +159,11 @@ class SteepestDirection(abstractCutScore):
 
 class cutGenerationDomain:
     r"""PiMin<=k, possibly with paramaterized constraints.
-   
     """
-    def __init__(self, k, possible_bkpt_params=[], constraints=[]):
+    def __init__(self, k):
         self._num_bkpts = k
-        self._possible_bkpt_params = breakpointSequence(possible_bkpt_params)
-        # If no possible breakpoints are given as parameters, read this as no constraints on the domain. 
-        # if some possible breakpoints are given, we assume these as possible constraints on the space, but not as necessary constraints on the space
-        # necessary constraints should be given via add constraint. 
-        if k > max_bkpts and len(self.possible_bkpt_params) == 0: 
-            raise ValueError("The minimal function cache requested has not been computed. Please compute the minimal funciton cache for {}.".format(k))
-        elif k <= max_bkpts:
-            self._PiMin = PiMinContContainer(self._num_bkpts, load_rep_elem_data=sys_info.path_to_rep_elem_data(k)) # sys_info here has a method to collect the file location and file names and passes this into PiMinConstinaterTo Load
-        else: # k > max_bkpts and bkpts_as_params
-            self._PiMin = None
-        for con in constraints:
-            if not isinstance(con, BasicSemialgebraicSet_base):
-                raise ValueError("Constraints should should be represented as BSAs")
-                # should also check that maps are compatiable or can be make assinged into the correct field. There is some detail checking to be done.
-        # Think about how BSA constraints sould be written and type normalizaton. 
-        self._constraints = constraints
+        self._PiMin = None
+        self._constraints = []
 
     def __repr__(self):
         return "The Space of Con. Minimal Functions with at most {} breakpoints and constrained by {}.".format(self._num_bkpts, self._constraints)
@@ -189,29 +171,22 @@ class cutGenerationDomain:
         # pass
     # def is_manifold_description(self):
         # pass
+    
+    def _load_PiMin(self):
+        if k > max_bkpts: # and len(self.possible_bkpt_params) == 0: 
+           raise ValueError("The minimal function cache requested has not been computed. Please compute the minimal funciton cache for {}.".format(k))
+    
+    def add_constraint(self, con):
+        self._constraints.append(con)
         
     def get_cells(self):
         r"""iterate over all cells (either explicilty defined or infered) with intersected constraints. Outputs a BSA.
         """
-        if self._PiMin is not None:
-            cells = self._PiMin.get_semialgebraic_sets()
-        else:
-            cell = None
-        for bkpt in Subsets(self.possible_bkpt_params):
-            for f_index in range(1, self._num_bkpts)
-                yield generate_cell_slice_from_bkpt_params(bkpt, f_index)
-    
-    def specify_f(self, f):
-        """
-        Assumes all elements in the cutGenerationDomain satisfy the condition that pi(f) = 1.
-        """
-        self._f = f 
-    
-    def current_f(self):
-        """
-        Reports the value of f such that pi(f) = 1 for all elements of cutGenerationDomain.
-        """
-        return self._f
+        if self._PiMin is None:
+            self._load_PiMin()
+        cells = self._PiMin.get_semialgebraic_sets()
+        for cell in cells:
+            yield cell.intersection(self._constraints)
 
     # def get_manifold(self): #To do, once I write manifold methods. 
         # raise NotImplementedError
@@ -245,55 +220,62 @@ class cutGenerationSolverBase:
     This has methods translate semialgebraic cell or manifold descriptions of data from the cutGenerationDomain to some external solver.
     The solve and __init__ methods are written to be compatiable with the cut generation problem  and provide an optimal solution to the problem 
     provided that the solver and data conversion methods have been written. 
+    
+    cutGenerationSovler infers the correct use of cutGenerationDomain based on provided options from the cutGenerationProblem. 
+    
+    The cutGenerationProblem options are listed below.
+    
+    Option: row selection: all_rows mathcal I = {i \in B : overline{b_i} \not \in ZZ}, lex_row = min  mathcal I, random row, rand(mathcal I), subset (any subset of mathcal I)
+    Option: algorithm = full space; bkpt as param: full (all combinatorial data, if needed k<n-m),  max, lex (selects lexicographically first parameter data k< n-m), or rand (randomly select parameter data)
+    Option: num_bkpt = full space: k <= max_bkpts; bkpt as param: full, lex rand, k <= n-m; max, k = n-m
+    Option: cut_score = parallelism, steepestdirection, scip, or custom
+    Option: multithread = notImplemented
     """
-    def __init__(self, cut_gen_domain, cut_score, algorithm, row_selection, multithread=False, **solver_options):
-        if not isinstance(cut_gen_domain, cutGenerationDomain):
-            raise ValueError("cut_gen_domain is required to be an instance of cutGenerationDomain")
-        if not isinstance(cut_score, cutScoreBase):
-            raise ValueError("cut_score is requried to be an instance of cutScoreBase")
-        self._cut_gen_domain = cut_gen_domain
+    def __init__(self, algorithm=None, cut_score=None, num_bkpt=None, row_selection=None, multithread=False):
+        if algorithm is None:
+            self. _algorithm = "bkpt as param, full"
         self._cut_score = cut_score
         self._cut_score.set_sage_to_solver_type(self.sage_to_solver_type)
-
-    def solve(self, MIP, min_or_max, **solver_options):
-        r"""Solves the paramaterized problem 
+        self._algorithm = algorithm
+        self._num_bkpt = num_bkpt
         
-        min/max cutScore s.t. 
-        options are options to be passed into the solver. 
+
+    def solve(self, MIP, **paramaterized_problem_solver_options):
+        r"""Solves the paramaterized problem. 
+        
+        Interperts the options and calls the correct solving algorithm. 
+        
+        Passes any instructions to the underlying solver.
+        
         """
-        # for now assuming problem is in the form of min 
-        current_domain_obj_val = inf
-        domain_problem_solution = None
+        # for now assuming problem is in the form of min
         
-        # ADD Options to which row get solved in the MIP.relaxed_basis()
-        for fractional_row in MIP.relaxed_basis():
-            self._cut_score.set_MIP_row(fractional_row)
-            f_constraint = "fractional_row[b_i] == f"
-            val_constraint =  "pi(f) == 1"
-            self._cut_gen_domain.specify_f(fractional_row[b_i]) #replace with actually BSA constraint.
-
-### solve problem for a set row. 
-        for subdomain in self._cut_gen_domain.get_cells():
-            objective_fun = self._cut_score # the call method here is a function from R^{2n} (parameter space) to R
-            if subdomain.is_linear() #reprlace with correct BSA command:
-                subdomain_solver_constraints = self.write_linear_constraints_from_bsa_for_solver(subdomain)
-                subdomain_problem_val, subdomain_problem_solution = self.solver_linear_solve(subdomain_solver_constraints, objective_fun, min_or_max, **solver_options)
-            else: # non-linear case
-                subdomain_solver_constraints = self.write_nonlinear_constraints_from_bsa_for_solver(subdomain)
-                subdomain_problem_val, subdomain_problem_solution = self.solver_nonlinear_solve(subdomain_solver_constraints, objective_fun, min_or_max, **solver_options)                
-            if subdomain_problem_val < current_domain_obj_val:
-                current_domain_obj_val = subdomain_problem_val
-                domain_problem_solution = subdomain_problem_solution
-        result = {}
-        result["objective_value"] = current_domain_obj_val
-        result["parameterized_solution"] = domain_problem_solution
+        if self._algorithm = "full":
+            result = self._algorithm_full_space(MIP)
+        elif self._algorithm =  "bkpt as param, full":
+            result = self._algorithm_bkpt_as_param_full(MIP)
         return result
 
+    def _algorithm_full_space(self, MIP):
+        r"""
+        """
+        pass
+        
+        # for subdomain in self._cut_gen_domain.get_full_cells():
+            # objective_fun = self._cut_score # the call method here is a function from R^{2n} (parameter space) to R
+            # subdomain_solver_constraints = self.write_nonlinear_constraints_from_bsa_for_solver(subdomain)
+            # subdomain_problem_val, subdomain_problem_solution = self.solver_nonlinear_solve(subdomain_solver_constraints, objective_fun, min_or_max, **solver_options)                
+
+    def _algorithm_bkpt_as_param_full(self, MIP):
+        r"""
+        """
+        pass
+
     @staticmethod
-    def write_linear_constraints_from_bsa_for_solver(bsa): # think about aspects of exactness; 
+    def write_linear_constraints_from_bsa_for_solver(self, bsa): # think about aspects of exactness; 
         r"""
         Given a BSA with only linear constraints, converts the bsa object into a format that the underlying solver can use.
-        """
+        """     
         raise NotImplementedError
 
     @staticmethod
@@ -303,23 +285,16 @@ class cutGenerationSolverBase:
         """
         raise NotImplementedError
 
-    def _algorithm_full_space(self):
-        pass
-
-    def _algorithm_bkpt_as_param(self, bkpt_choice):
-        pass
-    # def write_manifold_constraints(self, manifold):
-        # pass
 
     @staticmethod
-    def solver_linear_solve(self, constraints, objective, min_or_max,  **solver_options):
-        r"""
+            def solver_linear_solve(self, constraints, objective, min_or_max,  **solver_options):
+                r"""
         Interface to solver's min/max f(x) s.t. Ax<=b. 
         
         Should return optimal objective value, optimal objective solution.
         """
         raise NotImplementedError
-
+    
     @staticmehtod
     def solver_nonlinear_solve(self, constraints, objective, min_or_max, **solver_options):
         r"""
@@ -332,6 +307,63 @@ class cutGenerationSolverBase:
     def sage_to_solver_type(self, sage_field_element, field=None):
         raise NotImplementedError
     
+
+class sciPYCutGenSolvers(cutGenerationSolverBase):
+    @staticmethod
+    def write_linear_constraints_from_bsa_for_solver(self, bsa, epsilon=10**-9): # think about aspects of exactness; 
+        r"""
+        Given a BSA with only linear constraints, converts the bsa object into a format that the underlying solver can use.
+        """ 
+        pass
+
+    @staticmethod       
+    def write_nonlinear_constraints_from_bsa(self, bsa, epsilon=10**-9):
+        r"""
+        Given a BSA with non linear constraints, converts the bsa object into a format that the underlying solver can use.
+        
+        Treats p(x) < c as p(x) + epsilon <= c for all epsilon>0.
+        """
+        nonlinear_constraints = []
+        for con in bsa.eq_poly():
+            def con_conv_fun(array_like):
+                input_map = {con.parent().gens()[i]: array_like[i] for i in range(con.parent().ngens()}
+                return np.array([con.subs(input_map)])
+            nonlinear_constraints.append(NonlinearConstraint(con_conv_fun, 0,0))
+        for con in bsa.le_poly():
+            def con_conv_fun(array_like):
+                input_map = {con.parent().gens()[i]: array_like[i] for i in range(con.parent().ngens()}
+                return np.array([con.subs(input_map)])
+            nonlinear_constraints.append(NonlinearConstraint(con_conv_fun, -np.inf, 0))
+        for con in bsa.lt_poly():
+            def con_conv_fun(array_like):
+                input_map = {con.parent().gens()[i]: array_like[i] for i in range(con.parent().ngens()}
+                return np.array([con.subs(input_map)+epsilon])
+            nonlinear_constraints.append(NonlinearConstraint(con_conv_fun, -np.inf, 0))        
+        # what needs to happen is composion of maps. we have map that that goes from cords lambda1,....,lambdak, gamma1,....,gammak
+        return nonlinear_constraints
+
+
+    @staticmethod
+    def solver_linear_solve(self, constraints, objective, min_or_max,  **solver_options):
+        r"""
+        Interface to solver's min/max f(x) s.t. Ax<=b.      
+        
+        Should return optimal objective value, optimal objective solution.
+        """
+        raise NotImplementedError
+
+    @staticmehtod
+    def solver_nonlinear_solve(self, constraints, objective, **solver_options):
+        r"""
+        Interface to solver's min/max f(x) s.t. p_i(x) <= b_i, where p_i is a polynomial and at least 1 p_i has degree larger than 1.  
+        """
+        minimize(objective, constraints) # think about this...
+
+
+    @staticmethod
+    def sage_to_solver_type(self, sage_field_element, field=None):
+        return float(sage_field_element)
+
 
 class cutGenerationProblem:
     r"""
