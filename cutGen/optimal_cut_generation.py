@@ -1,6 +1,7 @@
 from cutgeneratingfunctionology.igp import *
 from minimalfunctioncache.system import sys_info
 from scipy.optimize import minimize, LinearConstraint, NonlinearConstraint
+from pyscipopt import Model
 # sys_info is an object that contains knows how to read data from the minimal function cache.
 
 # current defaults
@@ -102,7 +103,10 @@ class cutScore:
         pi = piecewiese_function_from_bkpts_and_values(bkpt + [1], val + [0])
         row_data =  self._cut_score.get_MIP_row()
         cut = [pi(QQ(bar_a_ij)) for bar_a_ij in row_data]
-        result = self.get_sage_to_solver_type()(self._cut_score.cut_score(cut))
+        if self._cut_obje_type == "max": # assume all solvers are phrased in the form min f(x) st. constraints
+            result = self.get_sage_to_solver_type()(-1*self._cut_score.cut_score(cut))
+        else:
+            result = self.get_sage_to_solver_type()(self._cut_score.cut_score(cut))
         return result
 
     def set_MIP_objective(self, new_objective):
@@ -116,6 +120,9 @@ class cutScore:
     def get_MIP_objective(self):
         return self._MIP_objective
 
+    def del_MIP_objective(self):
+         self._MIP_objective = None
+
     def get_MIP_row(self):
         """
         for fixed i,bar_i - (bar a_i)^T x_N 
@@ -124,6 +131,9 @@ class cutScore:
 
     def set_MIP_row(self, new_row):
         self._MIP_row = new_row
+        
+    def del_MIP_row(self):
+        self._MIP_row = None
 
     def _get_sage_to_solver_type(self):
         """
@@ -133,6 +143,10 @@ class cutScore:
         return self._sage_to_solver_type
 
     def _set_sage_to_solver_type(self, new_conversion):
+        """
+        Defined in the cutGenerationSolver. This method is only indeded to be set and unset by solving
+        routines in cutGenerationSolver. 
+        """
         self.__sage_to_solver_type = new_conversion
 
     def cut_obj_type(self):
@@ -156,77 +170,75 @@ class SteepestDirection(abstractCutScore):
         dot_product = vector(cls._MIP_objective).row()*vector(cut).column()
         return dot_product[0]
         
+# This might not be needed. Makes the solver complicated. Commenting out for now.
+# class cutGenerationDomain:
+    # r"""PiMin<=k, possibly with paramaterized constraints.
+    # """
+    # def __init__(self, k):
+        # self._num_bkpts = k
+        # self._PiMin = None
+        # self._constraints = []
 
-class cutGenerationDomain:
-    r"""PiMin<=k, possibly with paramaterized constraints.
-    """
-    def __init__(self, k):
-        self._num_bkpts = k
-        self._PiMin = None
-        self._constraints = []
-
-    def __repr__(self):
-        return "The Space of Con. Minimal Functions with at most {} breakpoints and constrained by {}.".format(self._num_bkpts, self._constraints)
-    # def is_cell_description(self):
-        # pass
-    # def is_manifold_description(self):
-        # pass
+    # def __repr__(self):
+        # return "The Space of Con. Minimal Functions with at most {} breakpoints and constrained by {}.".format(self._num_bkpts, self._constraints)
+    # # def is_cell_description(self):
+        # # pass
+    # # def is_manifold_description(self):
+        # # pass
     
-    def _load_PiMin(self):
-        if k > max_bkpts: # and len(self.possible_bkpt_params) == 0: 
-           raise ValueError("The minimal function cache requested has not been computed. Please compute the minimal funciton cache for {}.".format(k))
+    # def _load_PiMin(self):
+        # if k > max_bkpts: # and len(self.possible_bkpt_params) == 0: 
+           # raise ValueError("The minimal function cache requested has not been computed. Please compute the minimal funciton cache for {}.".format(k))
     
-    def add_constraint(self, con):
-        self._constraints.append(con)
+    # def add_constraint(self, con):
+        # self._constraints.append(con)
         
-    def get_cells(self):
-        r"""iterate over all cells (either explicilty defined or infered) with intersected constraints. Outputs a BSA.
-        """
-        if self._PiMin is None:
-            self._load_PiMin()
-        cells = self._PiMin.get_semialgebraic_sets()
-        for cell in cells:
-            yield cell.intersection(self._constraints)
+    # def get_cells(self):
+        # r"""iterate over all cells (either explicilty defined or infered) with intersected constraints. Outputs a BSA.
+        # """
+        # if self._PiMin is None:
+            # self._load_PiMin()
+        # cells = self._PiMin.get_semialgebraic_sets()
+        # for cell in cells:
+            # yield cell.intersection(self._constraints)
 
-    # def get_manifold(self): #To do, once I write manifold methods. 
-        # raise NotImplementedError
+    # # def get_manifold(self): #To do, once I write manifold methods. 
+        # # raise NotImplementedError
 
-    # def topology(self, cell):
-        # pass #open, closed, semi open? Is this needed? 
+    # # def topology(self, cell):
+        # # pass #open, closed, semi open? Is this needed? 
 
-    # def paramaterize_point(self, bkpt, val):
-        # return piecewise_function_from_breakpoints_and_values(bkpt+[1], val+[0])
+    # # def paramaterize_point(self, bkpt, val):
+        # # return piecewise_function_from_breakpoints_and_values(bkpt+[1], val+[0])
 
-    def is_element_of_domain(self, pwl_or_bkpt_and_val):
-        pass
+    # def is_element_of_domain(self, pwl_or_bkpt_and_val):
+        # pass
 
-    def add_constraint(self, constraint):
-        self._constraints.append(constraint) 
+    # def add_constraint(self, constraint):
+        # self._constraints.append(constraint) 
 
-    def remove_constrain(self, constraint):
-        self._constraints.pop(constraint)
+    # def remove_constrain(self, constraint):
+        # self._constraints.pop(constraint)
 
-    def add_possible_breakpoint_value(self, b):
-        self._possible_bkpt_params.append(b)
+    # def add_possible_breakpoint_value(self, b):
+        # self._possible_bkpt_params.append(b)
 
-    def generate_cell_slice_from_bkpt_params(self, bkpt, f_index):
-        assert(len(bkpt) ==  self._num_bkpts)
-        return value_nnc_polyhedron(bkpt, f_index) # write a version which includes makes a consistent number of parameters. 
+    # def generate_cell_slice_from_bkpt_params(self, bkpt, f_index):
+        # assert(len(bkpt) ==  self._num_bkpts)
+        # return value_nnc_polyhedron(bkpt, f_index) # write a version which includes makes a consistent number of parameters. 
 
 
 class cutGenerationSolverBase:
     r"""
-    A base class for interfacing with solvers. cutGenerationDomains can be expressed a finite collection of semialgebraic cells. 
-    This has methods translate semialgebraic cell or manifold descriptions of data from the cutGenerationDomain to some external solver.
-    The solve and __init__ methods are written to be compatiable with the cut generation problem  and provide an optimal solution to the problem 
-    provided that the solver and data conversion methods have been written. 
+    A base class for interfacing with solvers and solvoing a row cut generation problem.
+    
     
     cutGenerationSovler infers the correct use of cutGenerationDomain based on provided options from the cutGenerationProblem. 
-    
+                
     The cutGenerationProblem options are listed below.
     
     Option: row selection: all_rows mathcal I = {i \in B : overline{b_i} \not \in ZZ}, lex_row = min  mathcal I, random row, rand(mathcal I), subset (any subset of mathcal I)
-    Option: algorithm = full space; bkpt as param: full (all combinatorial data, if needed k<n-m),  max, lex (selects lexicographically first parameter data k< n-m), or rand (randomly select parameter data)
+    Option: row algorithm = full space; bkpt as param: full (all combinatorial data, if needed k<n-m),  max, lex (selects lexicographically first parameter data k< n-m), or rand (randomly select parameter data)
     Option: num_bkpt = full space: k <= max_bkpts; bkpt as param: full, lex rand, k <= n-m; max, k = n-m
     Option: cut_score = parallelism, steepestdirection, scip, or custom
     Option: multithread = notImplemented
@@ -238,6 +250,7 @@ class cutGenerationSolverBase:
         self._cut_score.set_sage_to_solver_type(self.sage_to_solver_type)
         self._algorithm = algorithm
         self._num_bkpt = num_bkpt
+        self._cut_space = None
         
 
     def solve(self, MIP, **paramaterized_problem_solver_options):
@@ -248,31 +261,64 @@ class cutGenerationSolverBase:
         Passes any instructions to the underlying solver.
         
         """
-        # for now assuming problem is in the form of min
-        
+        # assume MIP is a scip model; really we should be passing in and LP relaxation with variable infomation here.
+        # The cut generation problem 
         if self._algorithm = "full":
             result = self._algorithm_full_space(MIP)
         elif self._algorithm =  "bkpt as param, full":
             result = self._algorithm_bkpt_as_param_full(MIP)
         return result
 
-    def _algorithm_full_space(self, MIP):
+    def _load_pi_min(self):
+        if self._cut_space is None:
+            if self._num_bkpt > max_bkpts:
+                raise ValueError("The Minimal Functions Cache for {} breakpoints requested has not been computed.".format(self._num_bkpt))
+            self._cut_space = PiMinContContainer(self._num_bkpt, load_rep_elem_data=sys_info.load_pi_min(self._num_bkpt))
+
+    def _dump_pi_min(self):
+        self._cut_space = None
+
+    def _algorithm_full_space(self, relaxed_row, mip_obj, f, max_or_min):
         r"""
         """
-        pass
-        
-        # for subdomain in self._cut_gen_domain.get_full_cells():
-            # objective_fun = self._cut_score # the call method here is a function from R^{2n} (parameter space) to R
-            # subdomain_solver_constraints = self.write_nonlinear_constraints_from_bsa_for_solver(subdomain)
-            # subdomain_problem_val, subdomain_problem_solution = self.solver_nonlinear_solve(subdomain_solver_constraints, objective_fun, min_or_max, **solver_options)                
+        self._cut_score.set_mip_row(relaxed_row)
+        self._cut_score.set_mip_obj(mip_obj)
+        objective_fun = self._cut_score # the call method here is a function from R^{2n} (parameter space) to R
+        if max_or_min == "max":
+            best_value = -inf
+        else: #To do implement minimze options
+            best_value = inf
+        solution =  None
+        for subdomain in self._cut_space.get_semialgebraic_sets():
 
+            # 
+            for i in range(1, self._num_bkpt):
+                subdomain_with_f_constraint = copy(subdomain)
+                lambda_i = subdomain_with_f_constraint.polynomial_map()[0].parenet().gens()[i]
+                lhs =  lambda_i - QQ(f)
+                subdomain_with_f_constraint.add_polynomial_constraint(lhs, operator.eq)
+                # TODO: Use bkpt information of cell to determine if lambda_i == f is in the cell. If it isn't pass on solving the cell. 
+                subdomain_solver_constraints = self.write_nonlinear_constraints_from_bsa(subdomain_with_f_constraint)
+                subdomain_problem_val, subdomain_problem_solution = self.solver_nonlinear_solve(subdomain_solver_constraints, objective_fun, min_or_max, **solver_options)                
+                if best_value < subdomain_problem_val:
+                    best_value =  subdomain_problem_val
+                    solution = subdomain_problem_solution
+        self._cut_score.del_mip_row()
+        self._cut_score.del_mip_obj()
+                    
     def _algorithm_bkpt_as_param_full(self, MIP):
         r"""
         """
         pass
 
+    def _algorithm_bkpt_as_param_(self, MIP):
+        r"""
+        """
+        pass
+
+
     @staticmethod
-    def write_linear_constraints_from_bsa_for_solver(self, bsa): # think about aspects of exactness; 
+    def write_linear_constraints_from_bsa(self, bsa): # think about aspects of exactness; 
         r"""
         Given a BSA with only linear constraints, converts the bsa object into a format that the underlying solver can use.
         """     
@@ -287,8 +333,8 @@ class cutGenerationSolverBase:
 
 
     @staticmethod
-            def solver_linear_solve(self, constraints, objective, min_or_max,  **solver_options):
-                r"""
+    def solver_linear_solve(self, constraints, objective,  **solver_options):
+        r"""
         Interface to solver's min/max f(x) s.t. Ax<=b. 
         
         Should return optimal objective value, optimal objective solution.
@@ -296,7 +342,7 @@ class cutGenerationSolverBase:
         raise NotImplementedError
     
     @staticmehtod
-    def solver_nonlinear_solve(self, constraints, objective, min_or_max, **solver_options):
+    def solver_nonlinear_solve(self, constraints, objective, **solver_options):
         r"""
         Interface to solver's min/max f(x) s.t. p_i(x) <= b_i, where p_i is a polynomial and at least 1 p_i has degree larger than 1.  
         """
@@ -308,7 +354,7 @@ class cutGenerationSolverBase:
         raise NotImplementedError
     
 
-class sciPYCutGenSolvers(cutGenerationSolverBase):
+class scipyCutGenSolvers(cutGenerationSolverBase):
     @staticmethod
     def write_linear_constraints_from_bsa_for_solver(self, bsa, epsilon=10**-9): # think about aspects of exactness; 
         r"""
@@ -319,32 +365,39 @@ class sciPYCutGenSolvers(cutGenerationSolverBase):
     @staticmethod       
     def write_nonlinear_constraints_from_bsa(self, bsa, epsilon=10**-9):
         r"""
-        Given a BSA with non linear constraints, converts the bsa object into a format that the underlying solver can use.
+        Given a BSA with nonlinear constraints, converts into an equivlent set of nonlinear constraints for scipy. 
         
         Treats p(x) < c as p(x) + epsilon <= c for all epsilon>0.
         """
+        # Read polynomial parent to define map from BSA ambident to space to solver ambient space.
+        # input_map is equivlent to the identiy map. 
+        
+        # TODO: since BSA is only has polynomial constraints, explicitly define the gradient and hessian 
+        # of each constraint. 
+        # Either do some type of ring theoretic dual number extension,
+        # Add an auto diff feature or 
+        # or write scripts to explicitly computer the derivatives since polynomial derivatives are not that hard.
         nonlinear_constraints = []
-        for con in bsa.eq_poly():
-            def con_conv_fun(array_like):
-                input_map = {con.parent().gens()[i]: array_like[i] for i in range(con.parent().ngens()}
-                return np.array([con.subs(input_map)])
-            nonlinear_constraints.append(NonlinearConstraint(con_conv_fun, 0,0))
-        for con in bsa.le_poly():
-            def con_conv_fun(array_like):
-                input_map = {con.parent().gens()[i]: array_like[i] for i in range(con.parent().ngens()}
-                return np.array([con.subs(input_map)])
-            nonlinear_constraints.append(NonlinearConstraint(con_conv_fun, -np.inf, 0))
-        for con in bsa.lt_poly():
-            def con_conv_fun(array_like):
-                input_map = {con.parent().gens()[i]: array_like[i] for i in range(con.parent().ngens()}
-                return np.array([con.subs(input_map)+epsilon])
-            nonlinear_constraints.append(NonlinearConstraint(con_conv_fun, -np.inf, 0))        
-        # what needs to happen is composion of maps. we have map that that goes from cords lambda1,....,lambdak, gamma1,....,gammak
+        for polynomial in bsa.eq_poly():
+            def poly(array_like):
+                input_map = {polynomial.parent().gens()[i]: array_like[i] for i in range(polynomial.parent().ngens()}
+                return np.array([polynomial.subs(input_map)])
+            nonlinear_constraints.append(NonlinearConstraint(poly, 0,0))
+        for polynomial in bsa.le_poly():
+            def poly(array_like):
+                input_map = {polynomial.parent().gens()[i]: array_like[i] for i in range(polynomial.parent().ngens()}
+                return np.array([polynomial.subs(input_map)])
+            nonlinear_constraints.append(NonlinearConstraint(poly, -np.inf, 0))
+        for polynomial in bsa.lt_poly():
+            def poly(array_like):
+                input_map = {polynomial.parent().gens()[i]: array_like[i] for i in range(polynomial.parent().ngens()}
+                return np.array([polynomial.subs(input_map)+epsilon])
+            nonlinear_constraints.append(NonlinearConstraint(poly, -np.inf, 0))        
         return nonlinear_constraints
 
 
     @staticmethod
-    def solver_linear_solve(self, constraints, objective, min_or_max,  **solver_options):
+    def solver_linear_solve(self, constraints, objective,  **solver_options):
         r"""
         Interface to solver's min/max f(x) s.t. Ax<=b.      
         
@@ -355,7 +408,8 @@ class sciPYCutGenSolvers(cutGenerationSolverBase):
     @staticmehtod
     def solver_nonlinear_solve(self, constraints, objective, **solver_options):
         r"""
-        Interface to solver's min/max f(x) s.t. p_i(x) <= b_i, where p_i is a polynomial and at least 1 p_i has degree larger than 1.  
+        Given converted constraints and an objective function that is compitable with the solver, 
+        use scipy minimize to 
         """
         minimize(objective, constraints) # think about this...
 
