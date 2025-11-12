@@ -1,7 +1,7 @@
 from cutgeneratingfunctionology.igp import *
 from minimalfunctioncache.system import sys_info
 from scipy.optimize import minimize, LinearConstraint, NonlinearConstraint
-from pyscipopt import Model
+from pyscipopt import Model, Sepa
 # sys_info is an object that contains knows how to read data from the minimal function cache.
 
 # current defaults
@@ -278,7 +278,7 @@ class cutGenerationSolverBase:
     def _dump_pi_min(self):
         self._cut_space = None
 
-    def _algorithm_full_space(self, relaxed_row, mip_obj, f, max_or_min):
+    def _algorithm_full_space(self, relaxed_row, mip_obj, f):
         r"""
         """
         self._cut_score.set_mip_row(relaxed_row)
@@ -306,17 +306,15 @@ class cutGenerationSolverBase:
         self._cut_score.del_mip_row()
         self._cut_score.del_mip_obj()
                     
-    def _algorithm_bkpt_as_param_full(self, MIP):
+    def _algorithm_bkpt_as_param_full(self, relaxed_row, mip_obj, f):
         r"""
         """
         pass
 
-    def _algorithm_bkpt_as_param_(self, MIP):
-        r"""
-        """
-        pass
-
-
+    
+    def _algorithm_custom((self, relaxed_row, mip_obj, f):
+        raise NotImplementedError
+    
     @staticmethod
     def write_linear_constraints_from_bsa(self, bsa): # think about aspects of exactness; 
         r"""
@@ -354,7 +352,7 @@ class cutGenerationSolverBase:
         raise NotImplementedError
     
 
-class scipyCutGenSolvers(cutGenerationSolverBase):
+class scipyCutGenSolver(cutGenerationSolverBase):
     @staticmethod
     def write_linear_constraints_from_bsa_for_solver(self, bsa, epsilon=10**-9): # think about aspects of exactness; 
         r"""
@@ -409,7 +407,7 @@ class scipyCutGenSolvers(cutGenerationSolverBase):
     def solver_nonlinear_solve(self, constraints, objective, **solver_options):
         r"""
         Given converted constraints and an objective function that is compitable with the solver, 
-        use scipy minimize to 
+        use scipy minimize to ...
         """
         minimize(objective, constraints) # think about this...
 
@@ -421,20 +419,18 @@ class scipyCutGenSolvers(cutGenerationSolverBase):
 
 class cutGenerationProblem:
     r"""
-    MIP has data c^Tx st. Ax<=b; x>=0; A is n times m; x is len m.  
+    MIP has data c^Tx st. Ax<=b; x>=0; A is n times m; x is len m.
+    Interfaces between the cutGenerationSolver and constraint generation methods. 
     Define the problem min cutScore(pi, MIP) s.t. pi in PiMin <=k. 
     
     Option: row selection: all_rows, lex rows, random row, subset (find optimal cut over fractional row(s))
     Option: algorithm = full space; bkpt as param: full (all combinatorial data, if needed k<n-m),  max, lex (selects lexicographically first parameter data k< n-m), or rand (randomly select parameter data)
     Option: num_bkpt = full space: k <= max_bkpts; bkpt as param: full, lex rand, k <= n-m; max, k = n-m
     Option: cut_score = parallelism, steepestdirection, scip, or custom
-    Option: cut_gen_solver = scipy or custom
     Option: multithread = not_implemented
     """
-    def __init__(self, max_bkpts, cut_scoring_method, MIP, cut_domain, solver, **solving_parameters):
+    def __init__(self, max_bkpts, cut_scoring_method, cut_domain, solver, **solving_parameters):
         self._status = None
-        if isinstance(cut_domain, cutGenerationDomain):
-            self._domain = cut_domain # TODO: add plain text alias for domains types
         self._cut_scoring_method = cutScore(cut_scoring_method)
         # TODO: Process solver_options here, for now we write defaults.
         self._solve_mode = solver_mode_default # "full", "single row", 
@@ -447,6 +443,25 @@ class cutGenerationProblem:
     
     def solve(self):
         pass
-        
 
-# 100 percent using SCIP
+    def MIP_row_to_
+
+# Following SCIP GMIC tutorial; naturally since this is a genearlization of this type of seperator business. 
+# This seems the easist way to interface wiht SCIP. I will use the problem as an interface dispatching
+# options and processing datta into optimal cuts. In some shense, the problem needs
+# pramaterize data, then return cuts. 
+# The solver returns paramaterized data on from row MIP data
+# so the problem is responsible for putting MIP row data into a sover compitable form.
+# problem should serve as the interface between MIP solver and the cut Problme Solver. 
+# theCutProblem needs to take MIP data and put in into sage exact types. 
+# Baiscly, we want the paramaterization maps to be exact. So after solver and we've produced
+# a cut that is indeed and intersection cut for the numeridcal data presented. 
+# The therotical gareuntee of producing intersection cuts is what we are after. And we want from the prespective for the MIP's
+# solvers numerics to be the only worry for solving the MIP as the cut produced from the cut problem is exact (from a rational prespective)
+# once the cut is converted to the MIP, depending on how the floating point arithmatic happens, we might lose this exact guantree, but
+# at least we will attempt to take steps to ensure that property is perserved. 
+
+class OptimalCut(Sepa):
+    def __init__(self):
+        self.ncuts = 0
+        
