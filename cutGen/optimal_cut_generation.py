@@ -441,7 +441,7 @@ class cutGenerationProblem:
     def __repr__(self):
         pass
     
-    def solve(self):
+    def solve(self, row_data, f):
         pass
 
     def MIP_row_to_
@@ -461,7 +461,244 @@ class cutGenerationProblem:
 # once the cut is converted to the MIP, depending on how the floating point arithmatic happens, we might lose this exact guantree, but
 # at least we will attempt to take steps to ensure that property is perserved. 
 
+
+# Modifying the class from SCIP tutorial. All that is needed here is to rewrite the cutelem defintion to be pi_p. I can insert 
+# any GEMIC funciton
 class OptimalCut(Sepa):
+    
     def __init__(self):
         self.ncuts = 0
-        
+    def getOptimalCutFromRow(self, cols, rows, binvrow, binvarow, primsol, pi_p):
+        """ Given the row (binvarow, binvrow) of the tableau, computes optimized cut
+
+        :param primsol:  is the rhs of the tableau row.
+        :param cols:     are the variables
+        :param rows:     are the slack variables
+        :param binvrow:  components of the tableau row associated to the basis inverse
+        :param binvarow: components of the tableau row associated to the basis inverse * A
+        :param 1dPWL:    a minimal funciton element of PiMin<=k with pi_p(primsol)=1
+
+        The interesection cut is given by
+         sum(pi_p(a_j) x_j, j in J_I) \geq 1
+        where J_I are the integer non-basic variables and J_C are the continuous.
+        f_0 is the fractional part of primsol
+        a_j is the j-th coefficient of the row and f_j its fractional part
+        Note: we create -% <= -f_0 !!
+        Note: this formula is valid for a problem of the form Ax = b, x>= 0. Since we do not have
+        such problem structure in general, we have to (implicitly) transform whatever we are given
+        to that form. Specifically, non-basic variables at their lower bound are shifted so that the lower
+        bound is 0 and non-basic at their upper bound are complemented.
+        """
+
+        # initialize
+        cutcoefs = [0] * len(cols)
+        cutrhs = 0
+
+        # get scip
+        scip = self.model
+
+
+        # Generate cut coefficients for the original variables
+        for c in range(len(cols)):
+            col = cols[c]
+            assert col is not None
+            status = col.getBasisStatus()
+
+            # Get simplex tableau coefficient
+            if status == "lower":
+                # Take coefficient if nonbasic at lower bound
+                rowelem = binvarow[c]
+            elif status == "upper":
+                # Flip coefficient if nonbasic at upper bound: x --> u - x
+                rowelem = -binvarow[c]
+            else:
+                # variable is nonbasic free at zero -> cut coefficient is zero, skip OR
+                # variable is basic, skip
+                assert status == "zero" or status == "basic"
+                continue
+
+            # Integer variables
+            if col.isIntegral():
+                # warning: because of numerics cutelem < 0 is possible (though the fractional part is, mathematically, always positive)
+                # However, when cutelem < 0 it is also very close to 0, enough that isZero(cutelem) is true, so we ignore
+                # the coefficient (see below)
+                cutelem = float(pi_p(fractional(QQ(rowelem)))) #keep types correct
+            else:
+                # Continuous variables
+                # if rowelem < 0.0:
+                    # -sum(a_j*f_0/(1-f_0) x_j      , j in J_C s.t. a_j  <   0) >= f_0.
+                    # cutelem = rowelem * ratiof0compl
+                # else:
+                    #  sum(a_j x_j,                 , j in J_C s.t. a_j >=   0) -
+                    # cutelem = -rowelem
+                pass # IPs don't have cont. variables, which is what I'm writing for right  now. 
+            # cut is define when variables are in [0, infty). Translate to general bounds
+            if not scip.isZero(cutelem):
+                if col.getBasisStatus() == "upper":
+                    cutelem = -cutelem
+                    cutrhs += cutelem * col.getUb()
+                else:
+                    cutrhs += cutelem * col.getLb()
+                # Add coefficient to cut in dense form
+                cutcoefs[col.getLPPos()] = cutelem
+
+        # Generate cut coefficients for the slack variables; skip basic ones
+        for c in range(len(rows)):
+            row = rows[c]
+            assert row != None
+            status = row.getBasisStatus()
+
+            # free slack variable shouldn't appear
+            assert status != "zero"
+
+            # Get simplex tableau coefficient
+            if status == "lower":
+                # Take coefficient if nonbasic at lower bound
+                rowelem = binvrow[row.getLPPos()]
+                # But if this is a >= or ranged constraint at the lower bound, we have to flip the row element
+                if not scip.isInfinity(-row.getLhs()):
+                    rowelem = -rowelem
+            elif status == "upper":
+                # Take element if nonbasic at upper bound - see notes at beginning of file: only nonpositive slack variables
+                # can be nonbasic at upper, therefore they should be flipped twice and we can take the element directly.
+                rowelem = binvrow[row.getLPPos()]
+            else:
+                assert status == "basic"
+                continue
+
+            # if row is integral we can strengthen the cut coefficient
+            if row.isIntegral() and not row.isModifiable():
+                # warning: because of numerics cutelem < 0 is possible (though the fractional part is, mathematically, always positive)
+                # However, when cutelem < 0 it is also very close to 0, enough that isZero(cutelem) is true (see later)
+                cutelem = = float(pi_p(fractional(QQ(rowelem))))
+            else:
+                # Continuous variables
+                # if rowelem < 0.0:
+                    # -sum(a_j*f_0/(1-f_0) x_j      , j in J_C s.t. a_j  <   0) >= f_0.
+                #     cutelem = rowelem * ratiof0compl
+                # else:
+                    #  sum(a_j x_j,                 , j in J_C s.t. a_j >=   0) -
+                    # cutelem = -rowelem
+                pass
+
+            # cut is define in original variables, so we replace slack by its definition
+            if not scip.isZero(cutelem):
+                # get lhs/rhs
+                rlhs = row.getLhs()
+                rrhs = row.getRhs()
+                assert scip.isLE(rlhs, rrhs)
+                assert not scip.isInfinity(rlhs) or not scip.isInfinity(rrhs)
+
+                # If the slack variable is fixed, we can ignore this cut coefficient
+                if scip.isFeasZero(rrhs - rlhs):
+                  continue
+
+                # Unflip slack variable and adjust rhs if necessary: row at lower means the slack variable is at its upper bound.
+                # Since SCIP adds +1 slacks, this can only happen when constraints have a finite lhs
+                if row.getBasisStatus() == "lower":
+                    assert not scip.isInfinity(-rlhs)
+                    cutelem = -cutelem
+
+                rowcols = row.getCols()
+                rowvals = row.getVals()
+
+                assert len(rowcols) == len(rowvals)
+
+                # Eliminate slack variable: rowcols is sorted: [columns in LP, columns not in LP]
+                for i in range(row.getNLPNonz()):
+                    cutcoefs[rowcols[i].getLPPos()] -= cutelem * rowvals[i]
+
+                act = scip.getRowLPActivity(row)
+                rhsslack = rrhs - act
+                if scip.isFeasZero(rhsslack):
+                    assert row.getBasisStatus() == "upper" # cutelem != 0 and row active at upper bound -> slack at lower, row at upper
+                    cutrhs -= cutelem * (rrhs - row.getConstant())
+                else:
+                    assert scip.isFeasZero(act - rlhs)
+                    cutrhs -= cutelem * (rlhs - row.getConstant())
+
+        return cutcoefs, cutrhs
+
+   def sepaexeclp(self):
+        result = SCIP_RESULT.DIDNOTRUN
+        scip = self.model
+
+        if not scip.isLPSolBasic():
+            return {"result": result}
+
+        # get LP data
+        cols = scip.getLPColsData()
+        rows = scip.getLPRowsData()
+
+        # exit if LP is trivial
+        if len(cols) == 0 or len(rows) == 0:
+            return {"result": result}
+
+        result = SCIP_RESULT.DIDNOTFIND
+
+        # get basis indices
+        basisind = scip.getLPBasisInd()
+
+        # For all basic columns (not slacks) belonging to integer variables, try to generate a gomory cut
+        for i in range(len(rows)):
+            tryrow = False
+            c = basisind[i]
+
+            if c >= 0:
+                assert c < len(cols)
+                var = cols[c].getVar()
+
+                if var.vtype() != "CONTINUOUS":
+                    primsol = cols[c].getPrimsol()
+                    assert scip.getSolVal(None, var) == primsol
+
+                    if 0.005 <= scip.frac(primsol) <= 1 - 0.005:
+                        tryrow = True
+
+            # generate the cut!
+            if tryrow:
+                # get the row of B^-1 for this basic integer variable with fractional solution value
+                binvrow = scip.getLPBInvRow(i)
+
+                # get the tableau row for this basic integer variable with fractional solution value
+                binvarow = scip.getLPBInvARow(i)
+
+                # need to figure out how to also get in the costs into here
+                # also, I think I can just directily inferface with teh solver here. 
+                # I think I can put cutGenProblem make it simipeler or something. 
+                cgf = cutGenerationProblem(options**).solve(binvarow ,primsol) # should output the optimal CGF that we should use.
+                # get cut's coefficients
+                
+                cutcoefs, cutrhs = self.getOptimalCutFromRow(cols, rows, binvrow, binvarow, primsol, cgf)
+
+                # add cut
+                cut = scip.createEmptyRowSepa(self, "gmi%d_x%d"%(self.ncuts,c if c >= 0 else -c-1), lhs = None, rhs = cutrhs)
+                scip.cacheRowExtensions(cut)
+
+                for j in range(len(cutcoefs)):
+                    if scip.isZero(cutcoefs[j]): # maybe here we need isFeasZero
+                        continue
+                    scip.addVarToRow(cut, cols[j].getVar(), cutcoefs[j])
+
+                if cut.getNNonz() == 0:
+                    assert scip.isFeasNegative(cutrhs)
+                    return {"result": SCIP_RESULT.CUTOFF}
+
+
+                # Only take efficacious cuts, except for cuts with one non-zero coefficient (= bound changes)
+                # the latter cuts will be handled internally in sepastore.
+                if cut.getNNonz() == 1 or scip.isCutEfficacious(cut):
+
+                    # flush all changes before adding the cut
+                    scip.flushRowExtensions(cut)
+
+                    infeasible = scip.addCut(cut, forcecut=True)
+                    self.ncuts += 1
+
+                    if infeasible:
+                       result = SCIP_RESULT.CUTOFF
+                    else:
+                       result = SCIP_RESULT.SEPARATED
+                scip.releaseRow(cut)
+
+        return {"result": result
