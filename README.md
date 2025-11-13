@@ -1,6 +1,6 @@
 # Minimal Function Cache
 
-Minimal Funciotn Cache is a repository for a proposed cut and branch paradime in the thesis of Acadia Larsen which uses an explicit method select optimal cuts over a space of valid intersection cuts for a given MIP relaxation basis. 
+Minimal Funciotn Cache is a repository for a proposed cut generation method in the thesis of Acadia Larsen which uses an explicit method select optimal cuts over a space of valid intersection cuts for a given MIP relaxation basis. 
 
 ## Included Software, Tools, Documentation
 
@@ -29,10 +29,11 @@ Minimal Funciotn Cache is a repository for a proposed cut and branch paradime in
 
 # Installation
 
-# Lisence 
-The code is released under the GNU General Public License, version 2, or any later version as published by the Free Software Foundation.
-
-
 ## Single Machine
 
 ## HPC
+
+
+# Lisence 
+The code is released under the GNU General Public License, version 2, or any later version as published by the Free Software Foundation.
+
