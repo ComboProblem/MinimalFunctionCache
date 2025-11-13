@@ -171,7 +171,7 @@ class SteepestDirection(abstractCutScore):
         return dot_product[0]
 
 
-class cutGenerationSolverBase:
+class cutGenerationProblemBase:
     r"""
     A base class for interfacing with solvers and solvoing a row cut generation problem.
     
@@ -186,7 +186,7 @@ class cutGenerationSolverBase:
     Option: cut_score = parallelism, steepestdirection, scip, or custom
     Option: multithread = notImplemented
     """
-    def __init__(self, algorithm=None, cut_score=None, num_bkpt=None, row_selection=None, multithread=False):
+    def __init__(self, algorithm=None, cut_score=None, num_bkpt=None, row_selection=None, multithread=False, solver = ):
         if algorithm is None:
             self. _algorithm = "bkpt as param, full"
         self._cut_score = cut_score
@@ -257,7 +257,13 @@ class cutGenerationSolverBase:
     
     def _algorithm_custom((self, relaxed_row, mip_obj, f):
         raise NotImplementedError
-    
+
+class cutGenProblemSolverInterfaceBase:
+    """
+    Interfaces types from ``cutgeratingfunctionolgy`` to a specified solver.
+    """
+    def __init__():
+        pass
     @staticmethod
     def write_linear_constraints_from_bsa(self, bsa): # think about aspects of exactness; 
         r"""
@@ -295,7 +301,10 @@ class cutGenerationSolverBase:
         raise NotImplementedError
     
 
-class scipyCutGenSolver(cutGenerationSolverBase):
+class scipyCutGenProbelmSolverInterface(cutGenProblemSolverBase):
+    """
+    Interfaces types and objects from ``cutgeneratingfunctiology`` to scipy. 
+    """
     @staticmethod
     def write_linear_constraints_from_bsa_for_solver(self, bsa, epsilon=10**-9): # think about aspects of exactness; 
         r"""
@@ -357,37 +366,16 @@ class scipyCutGenSolver(cutGenerationSolverBase):
 
     @staticmethod
     def sage_to_solver_type(self, sage_field_element, field=None):
+        """
+        scipy supports inputs of floats, convert sage field element to its equivlant numerical (python) floating point value.
+        """
+        # all sage field elements are convertable to numerical values. 
+        # be lazy and assume that the field element is correct.
+        # 
         return float(sage_field_element)
 
 
-class cutGenerationProblem:
-    r"""
-    MIP has data c^Tx st. Ax<=b; x>=0; A is n times m; x is len m.
-    Interfaces between the cutGenerationSolver and constraint generation methods. 
-    Define the problem min cutScore(pi, MIP) s.t. pi in PiMin <=k. 
-    
-    Option: row selection: all_rows, lex rows, random row, subset (find optimal cut over fractional row(s))
-    Option: algorithm = full space; bkpt as param: full (all combinatorial data, if needed k<n-m),  max, lex (selects lexicographically first parameter data k< n-m), or rand (randomly select parameter data)
-    Option: num_bkpt = full space: k <= max_bkpts; bkpt as param: full, lex rand, k <= n-m; max, k = n-m
-    Option: cut_score = parallelism, steepestdirection, scip, or custom
-    Option: multithread = not_implemented
-    """
-    def __init__(self, max_bkpts, cut_scoring_method, cut_domain, solver, **solving_parameters):
-        self._status = None
-        self._cut_scoring_method = cutScore(cut_scoring_method)
-        # TODO: Process solver_options here, for now we write defaults.
-        self._solve_mode = solver_mode_default # "full", "single row", 
-        self._row_processing_order = "lex"
-        self._verbocity = 0 # 0, none, 1 - minimal, 2 - full. 
-        self._MIP = MIP
-    
-    def __repr__(self):
-        pass
-    
-    def solve(self, row_data, f):
-        pass
 
-    def MIP_row_to_
 
 # Following SCIP GMIC tutorial; naturally since this is a genearlization of this type of seperator business. 
 # This seems the easist way to interface wiht SCIP. I will use the problem as an interface dispatching
