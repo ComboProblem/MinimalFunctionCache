@@ -169,63 +169,6 @@ class SteepestDirection(abstractCutScore):
     def cut_score(cls, cut, field=None):
         dot_product = vector(cls._MIP_objective).row()*vector(cut).column()
         return dot_product[0]
-        
-# This might not be needed. Makes the solver complicated. Commenting out for now.
-# class cutGenerationDomain:
-    # r"""PiMin<=k, possibly with paramaterized constraints.
-    # """
-    # def __init__(self, k):
-        # self._num_bkpts = k
-        # self._PiMin = None
-        # self._constraints = []
-
-    # def __repr__(self):
-        # return "The Space of Con. Minimal Functions with at most {} breakpoints and constrained by {}.".format(self._num_bkpts, self._constraints)
-    # # def is_cell_description(self):
-        # # pass
-    # # def is_manifold_description(self):
-        # # pass
-    
-    # def _load_PiMin(self):
-        # if k > max_bkpts: # and len(self.possible_bkpt_params) == 0: 
-           # raise ValueError("The minimal function cache requested has not been computed. Please compute the minimal funciton cache for {}.".format(k))
-    
-    # def add_constraint(self, con):
-        # self._constraints.append(con)
-        
-    # def get_cells(self):
-        # r"""iterate over all cells (either explicilty defined or infered) with intersected constraints. Outputs a BSA.
-        # """
-        # if self._PiMin is None:
-            # self._load_PiMin()
-        # cells = self._PiMin.get_semialgebraic_sets()
-        # for cell in cells:
-            # yield cell.intersection(self._constraints)
-
-    # # def get_manifold(self): #To do, once I write manifold methods. 
-        # # raise NotImplementedError
-
-    # # def topology(self, cell):
-        # # pass #open, closed, semi open? Is this needed? 
-
-    # # def paramaterize_point(self, bkpt, val):
-        # # return piecewise_function_from_breakpoints_and_values(bkpt+[1], val+[0])
-
-    # def is_element_of_domain(self, pwl_or_bkpt_and_val):
-        # pass
-
-    # def add_constraint(self, constraint):
-        # self._constraints.append(constraint) 
-
-    # def remove_constrain(self, constraint):
-        # self._constraints.pop(constraint)
-
-    # def add_possible_breakpoint_value(self, b):
-        # self._possible_bkpt_params.append(b)
-
-    # def generate_cell_slice_from_bkpt_params(self, bkpt, f_index):
-        # assert(len(bkpt) ==  self._num_bkpts)
-        # return value_nnc_polyhedron(bkpt, f_index) # write a version which includes makes a consistent number of parameters. 
 
 
 class cutGenerationSolverBase:
