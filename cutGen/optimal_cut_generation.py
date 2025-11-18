@@ -15,9 +15,16 @@ cut_scoring_method = sys_info.cut_scoring_method
 cut_problem_solver = sys_info.cut_problem_solver
 
 def find_f_index(min_pwl):
-    min_pwl.end_points().index(find_f(min_pwl))
+    r"""
+    Assume a minimal function with a fininte nubmer of breakpoints. Finds the index i such that pi_p(lambda_i) = 1. 
+    """
+    return min_pwl.end_points().index(find_f(min_pwl))
+
 
 class UnsetData(Exception):
+    pass
+
+class SolverError(Exception):
     pass
 
 class abstractCutScore:
@@ -33,8 +40,8 @@ class abstractCutScore:
         r"""
         A(n) (assumed to be) smooth function from cutSpace to RR where cutSpace = {(\pi(bar a_ij))_{j\in N} : pi in PiMin}. 
 
-        Suppose that R is a ring such that either QQ subseteq R subseteq RR or elements of R 
-        coherese to a ring R' wiht QQ subseteq R' subseteq RR.
+        Suppose that R is a ring such that either QQ subseteq R subseteq RR or  R is a ring that can 
+        coercied to a ring R' wiht QQ subseteq R' subseteq RR.
 
         cut_score should use sagemath types to ensure generating a seperating cut.
         
@@ -49,11 +56,13 @@ class abstractCutScore:
 
     def cut_score_grad(cls, cut, mip_obj):
         r"""
+        Define the hessian of the cut score function. 
         """
         raise NotImplementedError
     
     def cut_score_hess(cls, cut, mip_obj):
         r"""
+        Define the hessian of the cut score function. 
         """
         raise NotImplementedError
 
@@ -124,6 +133,41 @@ class cutScore:
         sage_mip_obj =  [QQ(bar_cj) for bar_cj in self._MIP_objective]
         result = self.get_sage_to_solver_type()(self._cut_score.cut_score(sage_cut, sage_mip_obj))
         return result
+        
+    @staticmethod
+    def grad(parameters):
+        if self._MIP_objective is None:
+            raise UnsetData("Set MIP_objective before use of CutScore.")
+        if self._MIP_row is None:
+            raise UnsetData("Set MIP_row before use of CutScore.")
+        if self._sage_to_solver_type is None:
+            raise UnsetData("Set sage_to_solver_type before use of CutScore.")
+        bkpt = [QQ(b) for b in parameters[:len(parameters)/2]]
+        val = [QQ(v) for v in parameters[len(parameters)/2:]]
+        pi = piecewise_function_from_breakpoints_and_values(bkpt + [1], val + [0])
+        row_data = self.get_MIP_row()
+        sage_cut = [pi(fractional(QQ(bar_a_ij))) for bar_a_ij in row_data]
+        sage_mip_obj =  [QQ(bar_cj) for bar_cj in self._MIP_objective]
+        # To do, figure out vector solver type conversion. 
+        raise NotImplementedError
+        # return self._cut_score.cut_score_grad(sage_cut, sage_mip_obj)
+    
+    @staticmethod
+    def hess(parameters):
+        if self._MIP_objective is None:
+            raise UnsetData("Set MIP_objective before use of CutScore.")
+        if self._MIP_row is None:
+            raise UnsetData("Set MIP_row before use of CutScore.")
+        if self._sage_to_solver_type is None:
+            raise UnsetData("Set sage_to_solver_type before use of CutScore.")
+        bkpt = [QQ(b) for b in parameters[:len(parameters)/2]]
+        val = [QQ(v) for v in parameters[len(parameters)/2:]]
+        pi = piecewise_function_from_breakpoints_and_values(bkpt + [1], val + [0])
+        row_data = self.get_MIP_row()
+        sage_cut = [pi(fractional(QQ(bar_a_ij))) for bar_a_ij in row_data]
+        sage_mip_obj =  [QQ(bar_cj) for bar_cj in self._MIP_objective]
+        raise NotImplementedError
+        # return self._cut_score.cut_score_hess(sage_cut, sage_mip_obj)
 
     def set_MIP_obj(self, new_objective):
         """
@@ -226,7 +270,7 @@ class cutGenerationProblem:
         self._cut_score.set_MIP_row(binvarow)
         self._cut_score.set_MIP_obj(binvc)
         def objective_fun(params):
-            return self._cut_score(params) #lambda x: self._cut_score(x)
+            return self._cut_score(params)
         # if max_or_min == "max":
         best_value = -1*np.inf
         # else: #To do implement minimze options
@@ -238,33 +282,78 @@ class cutGenerationProblem:
              self._cut_space = PiMinContContainer(self._num_bkpt)
         for b, v in self._cut_space.get_rep_elems():
             # f is a bkpt when pi has a finite number of bkpts.
+            # start by finding a bkpt sequence in the same cell 
+            # such that lambda_f_index = f holds.
+            # pi(f) = 1; 
             pi_test = piecewise_function_from_breakpoints_and_values(b+[1], v+[0])
             bsa_f_index = find_f_index(pi_test)
-            subdomain_with_f_constraint = bsa_of_rep_element(b, v)
-            lambda_f_index = subdomain_with_f_constraint.polynomial_map()[0].parent().gens()[bsa_f_index]
-            lhs =  lambda_i - QQ(f)
-            x0 = b+v # pick inital guess to be a point known in the cell
-            subdomain_with_f_constraint.add_polynomial_constraint(lhs, operator.eq)
-            # TODO: Use bkpt to find if 
-            subdomain_solver_constraints = self._solver.write_nonlinear_constraints_from_bsa(subdomain_with_f_constraint)
-            subproblem_result = self._solver.nonlinear_solve(objective_fun, x0, subdomain_solver_constraints)   
-            if subproblem_result[0] is True:
-                if best_value < subproblem_result[1]:
-                    best_value = subproblem_result[1]
-                    result = subproblem_result
+            bkpt_bsa = nnc_poly_from_bkpt(b)
+            lhs = [1 if i == f_index else 0 for i in range(self._num_bkpt)] # lhs lambda^T == f 
+            bkpt_bsa.add_linear_constraint(lhs, operator.eq, f)
+            if bkpt_bsa.is_empty():
+                pass
+            else:
+                b0 = bkpt_bsa.find_point()
+                v0 = value_nnc_polyhedron(b0, bsa_f_index).find_point()
+                x0 = b0+v0 # a reasonable inital guess which satasfies the constraint lambda_f_index == f.
+                subdomain_with_f_constraint = bsa_of_rep_element(b0, v0)
+                lambda_f_index = subdomain_with_f_constraint.polynomial_map()[0].parent().gens()[bsa_f_index]
+                lhs =  lambda_i - QQ(f)
+                subdomain_with_f_constraint.add_polynomial_constraint(lhs, operator.eq)
+                subdomain_solver_constraints = self._solver.write_nonlinear_constraints_from_bsa(subdomain_with_f_constraint)
+                subproblem_result = self._solver.nonlinear_solve(objective_fun, x0, subdomain_solver_constraints)   
+                if subproblem_result[0] is True:
+                    if best_value < subproblem_result[1]:
+                        best_value = subproblem_result[1]
+                        result = subproblem_result
         # if result is None, the solver has failed to find any meaninful result. There should always be a result 
         # since gmic(f) bounds the maximization problem from above.
+        # and we should always find gmic in PiMin==2. 
         # TODO: Add something to reterive full status of subproblem solution.
-        # result [0
+        if result is None:
+            raise SolverError("the solver has failed, we should always get a result from the computaiton, check solver parameters")
+        bkpt_result = result[2][self._num_bkpt / 2 :]
+        vals_result = result[2][ : self._num_bkpt / 2]
+        pi_p = piecewise_function_from_breakpoints_and_values(bkpt_result+[1],vals_result+[0])
+        return pi_p
+
+    def _algorithm_bkpt_as_param_full(self, binvarow, binvc, f):
+        """
+        Solves the problem given a row of B^-1A and the reduced costs        
+        """
+        self._cut_score.set_MIP_row(binvarow)
+        self._cut_score.set_MIP_obj(binvc)
+        def objective_fun(params):
+            return self._cut_score(params)
+        # if max_or_min == "max":
+        # this is where the breakpoint sysquence type would be useful.
+        b0 = breakpointSequence(binvarow)
+        f_index = b.index(f)
+        value_polyhedron =  value_nnc_polyhedron(binvarow, f_index)
+        v0 = value_polyhedron.find_point()
+        x0 = b0+v0
+        bkpt_cons = None
+        # write constraints that imply b0 == bkpt
+        value_cons = write_linear_constraints_from_bsa(value_polyhedron)
+        solver_cons = bkpt_cons+value_cons
+        result = self._solver.nonlinear_solve(objective_fun, x0, solver_cons)
+        if result[0] is False:
+            raise SolverError("the solver has failed, we should always get a result from the computaiton, check solver parameters")
         bkpt_result = result[2][self._num_bkpt/2:]
         vals_result = result[2][:self._num_bkpt/2]
         pi_p = piecewise_function_from_breakpoints_and_values(bkpt_result+[1],vals_result+[0])
         return pi_p
-
-    def _algorithm_bkpt_as_param_full(self, rbinvarow, binvc, f):
-        pass
-
-    def _algorithm_custom(self, relaxed_row, mip_obj, f):
+       
+        
+     def _algorithm_bkpt_as_param_full_steepest_dir(self, binvarow, binvc, f):
+         raise NotImplementedError
+        
+        
+    def _algorithm_custom(self, binvarow, binvc, f):
+        """
+        Input: row data and cost data.
+        Output: minimal function
+        """
         raise NotImplementedError
 
 class abstractCutGenProblemSolverInterface:
@@ -289,7 +378,7 @@ class abstractCutGenProblemSolverInterface:
 
 
     @staticmethod
-    def linear_solve(constraints, objective,  **solver_options):
+    def lp_solve(constraints, objective,  **solver_options):
         r"""
         Interface to solver's min/max f(x) s.t. Ax<=b. 
         
@@ -329,32 +418,45 @@ class scipyCutGenProbelmSolverInterface(abstractCutGenProblemSolverInterface):
         r"""
         Given a BSA with nonlinear constraints, converts into an equivlent set of nonlinear constraints for scipy. 
         
-        Treats p(x) < c as p(x) + epsilon <= c for all epsilon>0.
-        """
-        # Read polynomial parent to define map from BSA ambident to space to solver ambient space.
-        # input_map is equivlent to the identiy map. 
-        
-        # TODO: since BSA is only has polynomial constraints, explicitly define the gradient and hessian 
-        # of each constraint. 
-        # Either do some type of ring theoretic dual number extension,
-        # Add an auto diff feature or 
-        # or write scripts to explicitly computer the derivatives since polynomial derivatives are not that hard.
+        Treats p(x) < c as p(x) + epsilon <= c for all epsilon>0.   
+        """         
         nonlinear_constraints = []
+        # All variables are implicitly bounded between 0 and 1. 
+        # We should establish using a lower bound.
         for polynomial in bsa.eq_poly():
             def poly(array_like):
+                # map coordinates names in BSA to coordinates of solvers
                 input_map = {polynomial.parent().gens()[i]: array_like[i] for i in range(polynomial.parent().ngens())}
                 return np.array([polynomial.subs(input_map)])
-            nonlinear_constraints.append(NonlinearConstraint(poly, 0,0))
+            def poly_grad(array_like):
+                input_map = {polynomial.parent().gens()[i]: array_like[i] for i in range(polynomial.parent().ngens())}
+                return np.array([partial.subs(input_map) for partial in polynomial.gradient()])
+            def poly_hess(array_like):
+                input_map = {polynomial.parent().gens()[i]: array_like[i] for i in range(polynomial.parent().ngens())}
+                return np.array([[second_partial.subs(input_map) for second_partial in partial.gradient()]  for partial in polynomial.gradient()]])
+            nonlinear_constraints.append(NonlinearConstraint(poly, 0, 0, jac=poly_grad, hess=poly_hess)))
         for polynomial in bsa.le_poly():
             def poly(array_like):
                 input_map = {polynomial.parent().gens()[i]: array_like[i] for i in range(polynomial.parent().ngens())}
                 return np.array([polynomial.subs(input_map)])
-            nonlinear_constraints.append(NonlinearConstraint(poly, -np.inf, 0))
+            def poly_grad(array_like):
+                input_map = {polynomial.parent().gens()[i]: array_like[i] for i in range(polynomial.parent().ngens())}
+                return np.array([partial.subs(input_map) for partial in polynomial.gradient()])
+            def poly_hess(array_like):
+                input_map = {polynomial.parent().gens()[i]: array_like[i] for i in range(polynomial.parent().ngens())}
+                return np.array([[second_partial.subs(input_map) for second_partial in partial.gradient()]  for partial in polynomial.gradient()]])
+            nonlinear_constraints.append(NonlinearConstraint(poly, -np.inf, 0,  jac=poly_grad, hess=poly_hess))
         for polynomial in bsa.lt_poly():
             def poly(array_like):
                 input_map = {polynomial.parent().gens()[i]: array_like[i] for i in range(polynomial.parent().ngens())}
                 return np.array([polynomial.subs(input_map)+epsilon])
-            nonlinear_constraints.append(NonlinearConstraint(poly, -np.inf, 0))        
+            def poly_grad(array_like):
+                input_map = {polynomial.parent().gens()[i]: array_like[i] for i in range(polynomial.parent().ngens())}
+                return np.array([partial.subs(input_map) for partial in polynomial.gradient()])
+            def poly_hess(array_like):
+                input_map = {polynomial.parent().gens()[i]: array_like[i] for i in range(polynomial.parent().ngens())}
+                return np.array([[second_partial.subs(input_map) for second_partial in partial.gradient()]  for partial in polynomial.gradient()]])
+            nonlinear_constraints.append(NonlinearConstraint(poly, -np.inf, 0,  jac=poly_grad, hess=poly_hess)))
         return nonlinear_constraints
 
 
@@ -368,7 +470,7 @@ class scipyCutGenProbelmSolverInterface(abstractCutGenProblemSolverInterface):
         raise NotImplementedError
 
     @staticmethod
-    def nonlinear_solve(objective, x0, cons, **solver_options):
+    def nonlinear_solve(objective, x0, cons, jac=None, hess=None,  **solver_options):
         r"""
         Given converted constraints and an objective function that is compitable with the solver, 
         use scipy minimize to ...
