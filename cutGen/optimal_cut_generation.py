@@ -24,8 +24,10 @@ def find_f_index(min_pwl):
 class UnsetData(Exception):
     pass
 
+
 class SolverError(Exception):
     pass
+
 
 class abstractCutScore:
     r"""
@@ -66,6 +68,7 @@ class abstractCutScore:
         """
         raise NotImplementedError
 
+
 class cutScore:
     """
     cutScore is objective function used in the cutOptimzationProblem.
@@ -101,7 +104,7 @@ class cutScore:
             self._cut_obj_type = kwrds.keys()["obj_type"]
         else:
             self._cut_obj_type = "max"
-    
+
     def __call__(self, parameters):
         r"""
         parameters is a list like object with even length of at most 2k.
@@ -202,6 +205,7 @@ class cutScore:
     def cut_obj_type(self):
          self._cut_obj_type
 
+
 class Parallelism(abstractCutScore):
     """
     Normalized cut parallelism score.
@@ -211,7 +215,8 @@ class Parallelism(abstractCutScore):
         cut_norm = vector(cut).norm()
         dot_product = vector(mip_obj).row()*vector(cut).column()
         return (dot_product[0]/(obj_norm*cut_norm))[0]
-        
+
+
 class SteepestDirection(abstractCutScore):
     """
     Steepest direction score. 
@@ -245,7 +250,6 @@ class cutGenerationProblem:
         self._algorithm = algorithm
         self._num_bkpt = num_bkpt
         self._cut_space = None
-        
 
     def solve(self, binvarow, binvc, f):
         r"""Solves the paramaterized problem. 
@@ -343,11 +347,9 @@ class cutGenerationProblem:
         vals_result = result[2][:self._num_bkpt/2]
         pi_p = piecewise_function_from_breakpoints_and_values(bkpt_result+[1],vals_result+[0])
         return pi_p
-       
-        
+
      def _algorithm_bkpt_as_param_full_steepest_dir(self, binvarow, binvc, f):
          raise NotImplementedError
-        
         
     def _algorithm_custom(self, binvarow, binvc, f):
         """
@@ -355,6 +357,7 @@ class cutGenerationProblem:
         Output: minimal function
         """
         raise NotImplementedError
+
 
 class abstractCutGenProblemSolverInterface:
     r"""
@@ -488,28 +491,6 @@ class scipyCutGenProbelmSolverInterface(abstractCutGenProblemSolverInterface):
         # be lazy and assume the_ring_element is something the converts to a rational number (or can be put into a floating point approximation).
         # this is a point where we lose the exactness of sage. 
         return float(sage_ring_element)
-
-
-
-
-# Following SCIP GMIC tutorial; naturally since this is a genearlization of this type of seperator business. 
-# This seems the easist way to interface wiht SCIP. I will use the problem as an interface dispatching
-# options and processing datta into optimal cuts. In some shense, the problem needs
-# pramaterize data, then return cuts. 
-# The solver returns paramaterized data on from row MIP data
-# so the problem is responsible for putting MIP row data into a sover compitable form.
-# problem should serve as the interface between MIP solver and the cut Problme Solver. 
-# theCutProblem needs to take MIP data and put in into sage exact types. 
-# Baiscly, we want the paramaterization maps to be exact. So after solver and we've produced
-# a cut that is indeed and intersection cut for the numeridcal data presented. 
-# The therotical gareuntee of producing intersection cuts is what we are after. And we want from the prespective for the MIP's
-# solvers numerics to be the only worry for solving the MIP as the cut produced from the cut problem is exact (from a rational prespective)
-# once the cut is converted to the MIP, depending on how the floating point arithmatic happens, we might lose this exact guantree, but
-# at least we will attempt to take steps to ensure that property is perserved. 
-
-
-# Modifying the class from SCIP tutorial. All that is needed here is to rewrite the cutelem defintion to be pi_p. I can insert 
-# any GEMIC funciton
 
 
 class OptimalCut(Sepa):
