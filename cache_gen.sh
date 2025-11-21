@@ -7,10 +7,10 @@
 NUM_BKPT = 2
 
 # Estimate CPU time required. 
-SAMPLE_SIZE = 1 # increasing sample size increases the inital run time which could lenghtly wiht current implementation. 
+SAMPLE_SIZE = 2 # used in time estimate
 TIME_PER_BATCH = 60 # mesured in minutes
 OVERHEAD_TIME_PER_BATCH = 5 # in minutes
-MAX_STD = 5 # used in time estimages
+MAX_STD = 5 # used in time estimate 
 MAX_NUM_ROW = 1000 # in each breakpoint file. 
 BACKEND = "pplite" 
 
