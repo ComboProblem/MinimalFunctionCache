@@ -14,6 +14,7 @@ sys_threading = sys_info.multithreading
 cut_scoring_method = sys_info.cut_scoring_method
 cut_problem_solver = sys_info.cut_problem_solver
 
+
 def find_f_index(min_pwl):
     r"""
     Assume a minimal function with a fininte nubmer of breakpoints. Finds the index i such that pi_p(lambda_i) = 1. 
@@ -47,10 +48,11 @@ class abstractCutScore:
 
         cut_score should use sagemath types to ensure generating a seperating cut.
         
-        input: cut: A list of elements of R
-        mip_obj: A list of elements of R
+        input: cut, mip_obj 
+        cut: A list of length n-m of elements of R representing a proposed cut to a given MIP.
+        mip_obj: A list of elements of R representing the MIPs objective function. 
 
-        output: an element of R
+        output: an element of R.
 
         EXAMPLES:
         """
@@ -58,13 +60,25 @@ class abstractCutScore:
 
     def cut_score_grad(cls, cut, mip_obj):
         r"""
-        Define the hessian of the cut score function. 
+        The gradient of the cut score function. 
+        
+        input: cut, mip_obj 
+        cut: A list of length n-m of elements of R representing a proposed cut to a given MIP.
+        mip_obj: A list of elements of R representing the MIPs objective function. 
+
+        output: A vector of length n-m of elements of R. 
         """
         raise NotImplementedError
     
     def cut_score_hess(cls, cut, mip_obj):
         r"""
-        Define the hessian of the cut score function. 
+        The hessian of the cut score function. 
+        
+        input: cut, mip_obj 
+        cut: A list of length n-m of elements of R representing a proposed cut to a given MIP.
+        mip_obj: A list of elements of R representing the MIPs objective function. 
+
+        output: An n-m by n-m matrix of elements of R. 
         """
         raise NotImplementedError
 
@@ -72,11 +86,17 @@ class abstractCutScore:
 class cutScore:
     """
     cutScore is objective function used in the cutOptimzationProblem.
+    
+    cutScore is a(n) (assumed to be) smooth function from cutSpace to RR where cutSpace = {(\pi_p(bar a_ij))_{j\in N} : pi in PiMin<=k}. 
+    
+    cutScore's domain is the cutSpace written in terms of the parameterization of PiMin<=k. 
+    
+    cutScore comes with optional methods to provide first and second order information to solvers.
     """
     @staticmethod
     def __classcall__(cls, name=None, **kwrds):
         r"""
-        input normalization of class
+        Input normalization of cutScore class.
         """
         if name == "parallelism" or name is None:
             return super().__classcall__(cls, cut_score=Parallelism)
@@ -90,10 +110,8 @@ class cutScore:
     def __init__(self, cutscore, **kwrds):
         r"""
         Initialize the paramatrized cut scoring function. 
-        
-        Maximization or minimlzation should be specified upon initlization.
-        
-        Data used with cutScore is managed by cutGenerationSolverBase.
+
+        Data used with cutScore is managed by the methods that call cutScore.
         """
         self._cut_score = cutscore(**kwrds)
         super().__init__()
@@ -107,21 +125,14 @@ class cutScore:
 
     def __call__(self, parameters):
         r"""
-        parameters is a list like object with even length of at most 2k.
-        parameters = (bkpt, val) represents a parameterize element of Pimin<=k, i.e. a point in RR^{2n} such that
-        the first n elements are the breakpoints, and the remainder of the values of the list are the values
-        of the parameterized function, pi_(bkpt,val) \in Pimin<=k.
+        Evaluate the cutScore.
+        
+        parameters is a list like object of real numbers with even length of at most 2k.
+        parameters = (bkpt, val) represents a parameterized element of Pimin<=k by the breakpoint and value paramaterization.
 
-        It is assumed parameters is satisfied the assumptions stated. No errors will be raised. 
+        EXAMPLES::
+        
         """
-        # parameters is and element of B\times V \se R^2n
-        # we assume parameters are of the solver type.
-        # we preform the composition of maps which takes us from the parameter space to
-        # minimal funciton space. 
-        # Internally, we use exact rational arithmetic as that is what works for the exact
-        # constructions of parametric functions.
-        # then convert the output to the correct solver type finishing the composition of 
-        # maps. 
         if self._MIP_objective is None:
             raise UnsetData("Set MIP_objective before use of CutScore.")
         if self._MIP_row is None:
@@ -139,6 +150,9 @@ class cutScore:
         
     @staticmethod
     def grad(parameters):
+        """
+        Graident of cutScore.
+        """
         if self._MIP_objective is None:
             raise UnsetData("Set MIP_objective before use of CutScore.")
         if self._MIP_row is None:
@@ -185,7 +199,7 @@ class cutScore:
 
     def get_MIP_row(self):
         """
-        for fixed i,bar_i - (bar a_i)^T x_N 
+        For fixed row i of the corner polyhedron;  bar_i - (bar a_i)^T x_N 
         """
         return self._MIP_row
 
@@ -223,16 +237,15 @@ class SteepestDirection(abstractCutScore):
     """
     def cut_score(cls, cut, mip_obj):
         dot_product = vector(mip_obj).row()*vector(cut).column()
-        return dot_product[0]
+        return dot_product[0][0]
 
 
 class cutGenerationProblem:
     r""" 
-    A base class for interfacing with solvers and solvoing a row cut generation problem.
+    A base class for interfacing with solvers and solving a cut generation problem.
     
+    The cut generation problem is defined as max cutScore(cut) s.t. cut in cutSpace. 
     
-    cutGenerationSovler infers the correct use of cutGenerationDomain based on provided options from the cutGenerationProblem. 
-                
     The cutGenerationProblem options are listed below.
     
     Option: row selection: all_rows mathcal I = {i \in B : overline{b_i} \not \in ZZ}, lex_row = min  mathcal I, random row, rand(mathcal I), subset (any subset of mathcal I)
@@ -280,6 +293,7 @@ class cutGenerationProblem:
         # else: #To do implement minimze options
         #     raise NotImplementedError
         result =  None
+        logging.disable(logging.WARNING)
         if self._cut_space is None: # load the semi algebraic descriptions. 
              if self._num_bkpt > max_bkpts:
                 raise ValueError("The Minimal Functions Cache for {} breakpoints requested has not been computed.".format(self._num_bkpt))
@@ -291,33 +305,35 @@ class cutGenerationProblem:
             # pi(f) = 1; 
             pi_test = piecewise_function_from_breakpoints_and_values(b+[1], v+[0])
             bsa_f_index = find_f_index(pi_test)
-            bkpt_bsa = nnc_poly_from_bkpt(b)
-            lhs = [1 if i == f_index else 0 for i in range(self._num_bkpt)] # lhs lambda^T == f 
-            bkpt_bsa.add_linear_constraint(lhs, operator.eq, f)
-            if bkpt_bsa.is_empty():
-                pass
-            else:
-                b0 = bkpt_bsa.find_point()
-                v0 = value_nnc_polyhedron(b0, bsa_f_index).find_point()
+            bkpt_bsa = nnc_poly_from_bkpt_t(b)
+            lambda_f_index = bkpt_bsa.polynomial_map()[0].parent().gens()[bsa_f_index]
+            bkpt_bsa.add_polynomial_constraint(lambda_f_index - f, operator.eq)
+            try:
+                if bkpt_bsa.is_empty():
+                    pass                  
+            except NotImplementedError: # Right now a venonese bsa raises a not implemented error for find point/is empty even when only linear maps are used. This should be fixed. 
+                b0 = list(bkpt_bsa.find_point()) # TODO: convert to a breakpoint sequence once implemented.
+                v0 = list(value_nnc_polyhedron(b0, bsa_f_index).find_point())
                 x0 = b0+v0 # a reasonable inital guess which satasfies the constraint lambda_f_index == f.
                 subdomain_with_f_constraint = bsa_of_rep_element(b0, v0)
                 lambda_f_index = subdomain_with_f_constraint.polynomial_map()[0].parent().gens()[bsa_f_index]
-                lhs =  lambda_i - QQ(f)
+                lhs =  lambda_f_index - QQ(f)
                 subdomain_with_f_constraint.add_polynomial_constraint(lhs, operator.eq)
                 subdomain_solver_constraints = self._solver.write_nonlinear_constraints_from_bsa(subdomain_with_f_constraint)
-                subproblem_result = self._solver.nonlinear_solve(objective_fun, x0, subdomain_solver_constraints)   
+                subproblem_result = self._solver.nonlinear_solve(objective_fun, x0, subdomain_solver_constraints)
+                if best_value < subproblem_result[1]:
+                    best_value = subproblem_result[1]
+                    result = subproblem_result
                 if subproblem_result[0] is True:
-                    if best_value < subproblem_result[1]:
-                        best_value = subproblem_result[1]
-                        result = subproblem_result
-        # if result is None, the solver has failed to find any meaninful result. There should always be a result 
-        # since gmic(f) bounds the maximization problem from above.
-        # and we should always find gmic in PiMin==2. 
+                    pass
+                else:
+                    logging.warning(f"The solver reports a failure {subproblem_result}")
+        # if result is None, the solver has failed to find any meaninful result. There should always be a result and the SolverError should never be raised (in practice).
         # TODO: Add something to reterive full status of subproblem solution.
         if result is None:
             raise SolverError("the solver has failed, we should always get a result from the computaiton, check solver parameters")
-        bkpt_result = result[2][self._num_bkpt / 2 :]
-        vals_result = result[2][ : self._num_bkpt / 2]
+        vals_result = [QQ(lambda_i) for lambda_i in result[2][self._num_bkpt :]]
+        bkpt_result = [QQ(gamma_i) for gamma_i in result[2][ : self._num_bkpt ]]
         pi_p = piecewise_function_from_breakpoints_and_values(bkpt_result+[1],vals_result+[0])
         return pi_p
 
@@ -331,10 +347,12 @@ class cutGenerationProblem:
             return self._cut_score(params)
         # if max_or_min == "max":
         # this is where the breakpoint sysquence type would be useful.
-        b0 = breakpointSequence(binvarow)
+        b0 = [fractional(lambda_i) for lambda_i in binvarrow+[f] if fractional(lambda_i) < 1].sort()
+        if 0 not in b0:
+            b0.inset(0, 0)
         f_index = b.index(f)
         value_polyhedron =  value_nnc_polyhedron(binvarow, f_index)
-        v0 = value_polyhedron.find_point()
+        v0 = list(value_polyhedron.find_point())
         x0 = b0+v0
         bkpt_cons = None
         # write constraints that imply b0 == bkpt
@@ -426,6 +444,7 @@ class scipyCutGenProbelmSolverInterface(abstractCutGenProblemSolverInterface):
         nonlinear_constraints = []
         # All variables are implicitly bounded between 0 and 1. 
         # We should establish using a lower bound.
+        # This section can be improved. Hessians need to be rewritten to have the right signature. 
         for polynomial in bsa.eq_poly():
             def poly(array_like):
                 # map coordinates names in BSA to coordinates of solvers
@@ -434,21 +453,21 @@ class scipyCutGenProbelmSolverInterface(abstractCutGenProblemSolverInterface):
             def poly_grad(array_like):
                 input_map = {polynomial.parent().gens()[i]: array_like[i] for i in range(polynomial.parent().ngens())}
                 return np.array([partial.subs(input_map) for partial in polynomial.gradient()])
-            def poly_hess(array_like):
-                input_map = {polynomial.parent().gens()[i]: array_like[i] for i in range(polynomial.parent().ngens())}
-                return np.array([[second_partial.subs(input_map) for second_partial in partial.gradient()]  for partial in polynomial.gradient()]])
-            nonlinear_constraints.append(NonlinearConstraint(poly, 0, 0, jac=poly_grad, hess=poly_hess)))
+            # def poly_hess(array_like):
+                # input_map = {polynomial.parent().gens()[i]: array_like[i] for i in range(polynomial.parent().ngens())}
+                # return np.array([[second_partial.subs(input_map) for second_partial in partial.gradient()]  for partial in polynomial.gradient()]])
+            nonlinear_constraints.append(NonlinearConstraint(poly, 0, 0, jac=poly_grad))
         for polynomial in bsa.le_poly():
             def poly(array_like):
-                input_map = {polynomial.parent().gens()[i]: array_like[i] for i in range(polynomial.parent().ngens())}
+                input_map = {polynomial.parent().gens()[i]: array_like[i] for i i -n range(polynomial.parent().ngens())}
                 return np.array([polynomial.subs(input_map)])
             def poly_grad(array_like):
                 input_map = {polynomial.parent().gens()[i]: array_like[i] for i in range(polynomial.parent().ngens())}
                 return np.array([partial.subs(input_map) for partial in polynomial.gradient()])
-            def poly_hess(array_like):
-                input_map = {polynomial.parent().gens()[i]: array_like[i] for i in range(polynomial.parent().ngens())}
-                return np.array([[second_partial.subs(input_map) for second_partial in partial.gradient()]  for partial in polynomial.gradient()]])
-            nonlinear_constraints.append(NonlinearConstraint(poly, -np.inf, 0,  jac=poly_grad, hess=poly_hess))
+            # def poly_hess(array_like):
+                # input_map = {polynomial.parent().gens()[i]: array_like[i] for i in range(polynomial.parent().ngens())}
+                # return np.array([[second_partial.subs(input_map) for second_partial in partial.gradient()]  for partial in polynomial.gradient()]])
+            nonlinear_constraints.append(NonlinearConstraint(poly, -np.inf, 0,  jac=poly_grad))
         for polynomial in bsa.lt_poly():
             def poly(array_like):
                 input_map = {polynomial.parent().gens()[i]: array_like[i] for i in range(polynomial.parent().ngens())}
@@ -456,10 +475,10 @@ class scipyCutGenProbelmSolverInterface(abstractCutGenProblemSolverInterface):
             def poly_grad(array_like):
                 input_map = {polynomial.parent().gens()[i]: array_like[i] for i in range(polynomial.parent().ngens())}
                 return np.array([partial.subs(input_map) for partial in polynomial.gradient()])
-            def poly_hess(array_like):
-                input_map = {polynomial.parent().gens()[i]: array_like[i] for i in range(polynomial.parent().ngens())}
-                return np.array([[second_partial.subs(input_map) for second_partial in partial.gradient()]  for partial in polynomial.gradient()]])
-            nonlinear_constraints.append(NonlinearConstraint(poly, -np.inf, 0,  jac=poly_grad, hess=poly_hess)))
+            # def poly_hess(array_like):
+                # input_map = {polynomial.parent().gens()[i]: array_like[i] for i in range(polynomial.parent().ngens())}
+                # return np.array([[second_partial.subs(input_map) for second_partial in partial.gradient()]  for partial in polynomial.gradient()]])
+            nonlinear_constraints.append(NonlinearConstraint(poly, -np.inf, 0,  jac=poly_grad))
         return nonlinear_constraints
 
 
@@ -478,8 +497,13 @@ class scipyCutGenProbelmSolverInterface(abstractCutGenProblemSolverInterface):
         Given converted constraints and an objective function that is compitable with the solver, 
         use scipy minimize to ...
         """
-        
-        result =  minimize(objective, x0, constraints=cons) # think about this...
+        if jac is not None:
+            if hess is not None:
+                result =  minimize(objective, x0, constraints=cons, jac=jac, hess=hess)
+            else:
+                result = minimize(objective, x0, constraints=cons, jac=jac)
+        else:
+            result = minimize(objective, x0, constraints=cons, jac=jac, hess=hess)
         return result.success, result.fun, result.x, result
 
     @staticmethod
@@ -500,7 +524,7 @@ class OptimalCut(Sepa):
     def getOptimalCutFromRow(self, cols, rows, binvrow, binvarow, primsol, pi_p):
         """ Given the row (binvarow, binvrow) of the tableau, computes optimized cut
 
-        :param primsol:  is the rhs of the tableau row.
+        :param primsol:  is the rhs of the tableau row
         :param cols:     are the variables
         :param rows:     are the slack variables
         :param binvrow:  components of the tableau row associated to the basis inverse
@@ -525,7 +549,6 @@ class OptimalCut(Sepa):
 
         # get scip
         scip = self.model
-
 
         # Generate cut coefficients for the original variables
         for c in range(len(cols)):
