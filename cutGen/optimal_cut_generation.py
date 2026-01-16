@@ -1,19 +1,7 @@
 from cutgeneratingfunctionology.igp import *
-from minimalfunctioncache.system import sys_info
 from scipy.optimize import minimize, LinearConstraint, NonlinearConstraint
-from pyscipopt import Model, Sepa
-# sys_info is an object that contains knows how to read data from the minimal function cache.
-
-# current defaults
-max_bkpts = sys_info.max_bkpts
-use_k_bkpts = sys_info.use_k_bkpts
-tol = sys_info.global_default_tol
-solver_mode = sys_info.solver_mode
-algo  =  sys_info.algorithm
-sys_threading = sys_info.multithreading
-cut_scoring_method = sys_info.cut_scoring_method
-cut_problem_solver = sys_info.cut_problem_solver
-
+from pyscipopt import Model, Sepa, SCIP_RESULT
+                      
 
 def find_f_index(min_pwl):
     r"""
@@ -133,6 +121,15 @@ class cutScore:
         EXAMPLES::
         
         """
+        # when using the call function; the parameters corrosponding to 
+        # lambda_0 and gamma_0 are 0. 
+        # this needs to be strictly enforced to ensure that a minimal function
+        # is produced.
+        # Letting a solver control these parameters is not adviseable 
+        # since the solver uses floating points rather than exact rational
+        # for detemrining if a constraint like lambda_0 == 0 is enforced
+        # this will result in stuff like lambda_0 > 0 which cannot make a 
+        # minimal function.
         if self._MIP_objective is None:
             raise UnsetData("Set MIP_objective before use of CutScore.")
         if self._MIP_row is None:
@@ -141,7 +138,7 @@ class cutScore:
             raise UnsetData("Set sage_to_solver_type before use of CutScore.")
         bkpt = [QQ(b) for b in parameters[:len(parameters)/2]]
         val = [QQ(v) for v in parameters[len(parameters)/2:]]
-        pi = piecewise_function_from_breakpoints_and_values(bkpt + [1], val + [0])
+        pi = piecewise_function_from_breakpoints_and_values([0] + bkpt + [1], [0] +val + [0])
         row_data = self.get_MIP_row()
         sage_cut = [pi(fractional(QQ(bar_a_ij))) for bar_a_ij in row_data]
         sage_mip_obj =  [QQ(bar_cj) for bar_cj in self._MIP_objective]
@@ -256,12 +253,22 @@ class cutGenerationProblem:
     """
     def __init__(self, algorithm=None, cut_score=None, num_bkpt=None, solver=None, multithread=False):
         if algorithm is None:
-            self. _algorithm = "bkpt as param, full"
-        self._cut_score = cut_score
-        self._solver = solver
+            self._algorithm = "full"
+        else:
+            self._algorithm = algorithm
+        if cut_score is None:
+            self._cut_score = cutScore(SteepestDirection)
+        else:
+            self._cut_score = cut_score
+        if num_bkpt is None or num_bkpt < 1:
+            raise ValueError("At least two breakpoints are required. Please specify a number of breakpoints.")
+        else:
+            self._num_bkpt = num_bkpt
+        if solver is None:
+            self._solver = scipyCutGenProbelmSolverInterface
+        else:
+            self._solver = solver
         self._cut_score.set_sage_to_solver_type(self._solver.sage_to_solver_type)
-        self._algorithm = algorithm
-        self._num_bkpt = num_bkpt
         self._cut_space = None
 
     def solve(self, binvarow, binvc, f):
@@ -275,10 +282,10 @@ class cutGenerationProblem:
         # assume MIP is a scip model; really we should be passing in and LP relaxation with variable infomation here.
         # The cut generation problem 
         if self._algorithm == "full":
-            result = self._algorithm_full_space(binvarow, binvc, f)
+            cgf = self._algorithm_full_space(binvarow, binvc, f)
         elif self._algorithm == "bkpt as param, full":
-            result = self._algorithm_bkpt_as_param_full(binvarow, binvc, f)
-        return result
+            cgf = self._algorithm_bkpt_as_param_full(binvarow, binvc, f)
+        return cgf
 
     def _algorithm_full_space(self, binvarow, binvc, f):
         r"""
@@ -286,14 +293,14 @@ class cutGenerationProblem:
         """
         self._cut_score.set_MIP_row(binvarow)
         self._cut_score.set_MIP_obj(binvc)
-        def objective_fun(params):
+        frac_f = fractional(QQ(f))
+        def cut_score(params):
             return self._cut_score(params)
         # if max_or_min == "max":
         best_value = -1*np.inf
         # else: #To do implement minimze options
         #     raise NotImplementedError
-        result =  None
-        logging.disable(logging.WARNING)
+        best_result = None
         if self._cut_space is None: # load the semi algebraic descriptions. 
              if self._num_bkpt > max_bkpts:
                 raise ValueError("The Minimal Functions Cache for {} breakpoints requested has not been computed.".format(self._num_bkpt))
@@ -305,69 +312,74 @@ class cutGenerationProblem:
             # pi(f) = 1; 
             pi_test = piecewise_function_from_breakpoints_and_values(b+[1], v+[0])
             bsa_f_index = find_f_index(pi_test)
-            bkpt_bsa = nnc_poly_from_bkpt_t(b)
+            bkpt_bsa = nnc_poly_from_bkpt_sequence(b)
             lambda_f_index = bkpt_bsa.polynomial_map()[0].parent().gens()[bsa_f_index]
-            bkpt_bsa.add_polynomial_constraint(lambda_f_index - f, operator.eq)
+            bkpt_bsa.add_polynomial_constraint(lambda_f_index - frac_f, operator.eq)
             try:
-                if bkpt_bsa.is_empty():
-                    pass                  
-            except NotImplementedError: # Right now a venonese bsa raises a not implemented error for find point/is empty even when only linear maps are used. This should be fixed. 
-                b0 = list(bkpt_bsa.find_point()) # TODO: convert to a breakpoint sequence once implemented.
-                v0 = list(value_nnc_polyhedron(b0, bsa_f_index).find_point())
-                x0 = b0+v0 # a reasonable inital guess which satasfies the constraint lambda_f_index == f.
-                subdomain_with_f_constraint = bsa_of_rep_element(b0, v0)
-                lambda_f_index = subdomain_with_f_constraint.polynomial_map()[0].parent().gens()[bsa_f_index]
-                lhs =  lambda_f_index - QQ(f)
-                subdomain_with_f_constraint.add_polynomial_constraint(lhs, operator.eq)
-                subdomain_solver_constraints = self._solver.write_nonlinear_constraints_from_bsa(subdomain_with_f_constraint)
-                subproblem_result = self._solver.nonlinear_solve(objective_fun, x0, subdomain_solver_constraints)
-                if best_value < subproblem_result[1]:
-                    best_value = subproblem_result[1]
-                    result = subproblem_result
-                if subproblem_result[0] is True:
-                    pass
-                else:
-                    logging.warning(f"The solver reports a failure {subproblem_result}")
-        # if result is None, the solver has failed to find any meaninful result. There should always be a result and the SolverError should never be raised (in practice).
-        # TODO: Add something to reterive full status of subproblem solution.
-        if result is None:
-            raise SolverError("the solver has failed, we should always get a result from the computaiton, check solver parameters")
-        vals_result = [QQ(lambda_i) for lambda_i in result[2][self._num_bkpt :]]
-        bkpt_result = [QQ(gamma_i) for gamma_i in result[2][ : self._num_bkpt ]]
-        pi_p = piecewise_function_from_breakpoints_and_values(bkpt_result+[1],vals_result+[0])
+                if not bkpt_bsa.upstairs().is_empty():
+                    b0 = list(bkpt_bsa.find_point())
+                    v0 = list(value_nnc_polyhedron(b0, bsa_f_index).find_point())
+                    x0 = b0[1:]+v0[1:] # a reasonable inital guess which satasfies the constraint lambda_f_index == f.
+                    # specify explicitly gamma_0 == lambda_0 == 0 in the call of the cut score function
+                    # here we should ignore these parameters from the perspective of the solver.
+                    subdomain_with_f_constraint = bsa_of_rep_element_pi_of_0_not_param(b0, v0)
+                    lambda_f_index = subdomain_with_f_constraint.polynomial_map()[0].parent().gens()[bsa_f_index]
+                    lhs =  lambda_f_index - frac_f
+                    subdomain_with_f_constraint.add_polynomial_constraint(lhs, operator.eq)
+                    subdomain_solver_constraints = self._solver.write_nonlinear_constraints_from_bsa(subdomain_with_f_constraint)
+                    subproblem_result = self._solver.nonlinear_solve(cut_score, x0, subdomain_solver_constraints)
+                    if best_result is None: # set a known result, should be a GMIC function at the least, and once should be discovered.
+                        best_result = subproblem_result
+                    if best_value < subproblem_result[1]:
+                        best_value = subproblem_result[1]
+                        best_result = subproblem_result
+                    if subproblem_result[0] is True:
+                        pass
+                    # else:
+                    #     logging.warning(f"The solver reports a failure {subproblem_result}")
+            except EmptyBSA:
+                pass
+        # if result is None, the solver has failed to find any meaninful result. 
+        # There should always be a result and the SolverError should never be raised.
+        if best_result is None:
+            raise SolverError("the solver has failed, we should always get a result from the computaiton.")
+        vals_result = [QQ(lambda_i) for lambda_i in best_result[2][self._num_bkpt-1:]]
+        bkpt_result = [QQ(gamma_i) for gamma_i in best_result[2][ : self._num_bkpt-1]]
+        pi_p = piecewise_function_from_breakpoints_and_values([0]+bkpt_result+[1],[0]+vals_result+[0])
+        logging.info(f"The solver reports the following problem status for solving the row problem: {best_result}")
+        logging.info(f"The found cgf is {pi_p}")
+        print(f"Found an optimal cgf {pi_p}")
         return pi_p
 
-    def _algorithm_bkpt_as_param_full(self, binvarow, binvc, f):
+    def _algorithm_bkpt_as_param(self, binvarow, binvc, f):
         """
         Solves the problem given a row of B^-1A and the reduced costs        
         """
         self._cut_score.set_MIP_row(binvarow)
         self._cut_score.set_MIP_obj(binvc)
-        def objective_fun(params):
+        def cut_score(params):
             return self._cut_score(params)
-        # if max_or_min == "max":
-        # this is where the breakpoint sysquence type would be useful.
-        b0 = [fractional(lambda_i) for lambda_i in binvarrow+[f] if fractional(lambda_i) < 1].sort()
-        if 0 not in b0:
-            b0.inset(0, 0)
-        f_index = b.index(f)
-        value_polyhedron =  value_nnc_polyhedron(binvarow, f_index)
+        frac_f = fractional(QQ(f))
+        symmetrized_bkpts = [0, frac_f]
+        for b in binvarow:
+            b_sym = frac_f - b 
+            if b_sym > 0:
+                symmetrized_bkpts += [b, b_sym]
+            elif b_sym < 0:
+                symmetrized_bkpts += [b, 1+b_sym]
+        symmetrized_bkpts.sort()
+        f_index = symmetrized_bkpts.index(frac_f)
+        value_polyhedron =  value_nnc_polyhedron_gamma_0_not_as_param(symmetrized_bkpts, f_index)
         v0 = list(value_polyhedron.find_point())
-        x0 = b0+v0
-        bkpt_cons = None
-        # write constraints that imply b0 == bkpt
+        # Optimize over value polyhedron only; ignore the 0 constraint.
         value_cons = write_linear_constraints_from_bsa(value_polyhedron)
-        solver_cons = bkpt_cons+value_cons
-        result = self._solver.nonlinear_solve(objective_fun, x0, solver_cons)
-        if result[0] is False:
-            raise SolverError("the solver has failed, we should always get a result from the computaiton, check solver parameters")
-        bkpt_result = result[2][self._num_bkpt/2:]
-        vals_result = result[2][:self._num_bkpt/2]
-        pi_p = piecewise_function_from_breakpoints_and_values(bkpt_result+[1],vals_result+[0])
+        result = self._solver.nonlinear_solve(cut_score, v0[1:], value_cons)       
+        vals_result = [QQ(lambda_i) for lambda_i in best_result[2]]
+        pi_p = piecewise_function_from_breakpoints_and_values([0]+bkpt_result+[1],[0]+vals_result+[0])
         return pi_p
 
-     def _algorithm_bkpt_as_param_full_steepest_dir(self, binvarow, binvc, f):
-         raise NotImplementedError
+    def _algorithm_bkpt_as_param_full_steepest_dir(self, binvarow, binvc, f):
+        raise NotImplementedError
         
     def _algorithm_custom(self, binvarow, binvc, f):
         """
@@ -459,7 +471,7 @@ class scipyCutGenProbelmSolverInterface(abstractCutGenProblemSolverInterface):
             nonlinear_constraints.append(NonlinearConstraint(poly, 0, 0, jac=poly_grad))
         for polynomial in bsa.le_poly():
             def poly(array_like):
-                input_map = {polynomial.parent().gens()[i]: array_like[i] for i i -n range(polynomial.parent().ngens())}
+                input_map = {polynomial.parent().gens()[i]: array_like[i] for i in range(polynomial.parent().ngens())}
                 return np.array([polynomial.subs(input_map)])
             def poly_grad(array_like):
                 input_map = {polynomial.parent().gens()[i]: array_like[i] for i in range(polynomial.parent().ngens())}
@@ -518,9 +530,9 @@ class scipyCutGenProbelmSolverInterface(abstractCutGenProblemSolverInterface):
 
 
 class OptimalCut(Sepa):
-    def __init__(self):
+    def __init__(self, use_k_bkpts=2, algorithm=None, cut_scoring_method=None, solver=None):
         self.ncuts = 0
-        self.cgp = cutGenerationProblem(algorithm=algo, cut_score=cut_scoring_method, num_bkpt=use_k_bkpts, multithread=sys_threading, solver=cut_problem_solver)
+        self.cgp = cutGenerationProblem(algorithm=algorithm, cut_score=cut_scoring_method, num_bkpt=use_k_bkpts, solver=solver)
     def getOptimalCutFromRow(self, cols, rows, binvrow, binvarow, primsol, pi_p):
         """ Given the row (binvarow, binvrow) of the tableau, computes optimized cut
 
@@ -576,6 +588,7 @@ class OptimalCut(Sepa):
                 # the coefficient (see below)
                 cutelem = float(pi_p(fractional(QQ(rowelem)))) #keep types correct
             else:
+                # how does one generate cont
                 # Continuous variables
                 # if rowelem < 0.0:
                     # -sum(a_j*f_0/(1-f_0) x_j      , j in J_C s.t. a_j  <   0) >= f_0.
@@ -671,7 +684,7 @@ class OptimalCut(Sepa):
 
         return cutcoefs, cutrhs
 
-   def sepaexeclp(self):
+    def sepaexeclp(self):
         result = SCIP_RESULT.DIDNOTRUN
         scip = self.model
 
@@ -716,7 +729,7 @@ class OptimalCut(Sepa):
                 binvarow = scip.getLPBInvARow(i)
                
                 # get current reduced costs for objective evaluation.
-                costs = [scip.getColRedCost(j) for j in range(len(cols)) if j not inbasisind]
+                costs = [scip.getColRedCost(j) for j in cols if j not in basisind]
 
                 cgf = self.cgp.solve(binvarow, costs, primsol) # produce an optimal cgf
                 
