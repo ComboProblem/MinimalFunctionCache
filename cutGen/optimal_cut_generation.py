@@ -1,6 +1,8 @@
 from cutgeneratingfunctionology.igp import *
 from scipy.optimize import minimize, LinearConstraint, NonlinearConstraint
 from pyscipopt import Model, Sepa, SCIP_RESULT
+
+max_bkpts = 4
                       
 
 def find_f_index(min_pwl):
@@ -15,6 +17,10 @@ class UnsetData(Exception):
 
 
 class SolverError(Exception):
+    pass
+
+
+class FeasiblityError(Exception):
     pass
 
 
@@ -111,7 +117,7 @@ class cutScore:
         else:
             self._cut_obj_type = "max"
 
-    def __call__(self, parameters):
+    def __call__(self, parameters): 
         r"""
         Evaluate the cutScore.
         
@@ -121,24 +127,25 @@ class cutScore:
         EXAMPLES::
         
         """
-        # when using the call function; the parameters corrosponding to 
-        # lambda_0 and gamma_0 are 0. 
-        # this needs to be strictly enforced to ensure that a minimal function
-        # is produced.
-        # Letting a solver control these parameters is not adviseable 
-        # since the solver uses floating points rather than exact rational
-        # for detemrining if a constraint like lambda_0 == 0 is enforced
-        # this will result in stuff like lambda_0 > 0 which cannot make a 
-        # minimal function.
+        # It is necessary for frac_f to be converted to exact rational from the MIP. 
+
         if self._MIP_objective is None:
             raise UnsetData("Set MIP_objective before use of CutScore.")
         if self._MIP_row is None:
             raise UnsetData("Set MIP_row before use of CutScore.")
         if self._sage_to_solver_type is None:
             raise UnsetData("Set sage_to_solver_type before use of CutScore.")
-        bkpt = [QQ(b) for b in parameters[:len(parameters)/2]]
-        val = [QQ(v) for v in parameters[len(parameters)/2:]]
-        pi = piecewise_function_from_breakpoints_and_values([0] + bkpt + [1], [0] +val + [0])
+        # To generate a seperator, we have to ensure, the function pi_parameters
+        # is minimal.
+        # parameters is given from some non linear solver and might not meet the conditions
+        # of minimality. 
+        # validate_point will either give a point p = b,v which
+        # we believe to up to rounding and L.C. that pi_p is a minimal function in the current cell
+        # and satasfies the conditons of the model.
+        # or will raise an error
+        b, v = self.validate_point(parameters)
+        self.set_feasible_point(b+v)
+        pi = piecewise_function_from_breakpoints_and_values(b + [1], v + [0])
         row_data = self.get_MIP_row()
         sage_cut = [pi(fractional(QQ(bar_a_ij))) for bar_a_ij in row_data]
         sage_mip_obj =  [QQ(bar_cj) for bar_cj in self._MIP_objective]
@@ -150,38 +157,67 @@ class cutScore:
         """
         Graident of cutScore.
         """
-        if self._MIP_objective is None:
-            raise UnsetData("Set MIP_objective before use of CutScore.")
-        if self._MIP_row is None:
-            raise UnsetData("Set MIP_row before use of CutScore.")
-        if self._sage_to_solver_type is None:
-            raise UnsetData("Set sage_to_solver_type before use of CutScore.")
-        bkpt = [QQ(b) for b in parameters[:len(parameters)/2]]
-        val = [QQ(v) for v in parameters[len(parameters)/2:]]
-        pi = piecewise_function_from_breakpoints_and_values(bkpt + [1], val + [0])
-        row_data = self.get_MIP_row()
-        sage_cut = [pi(fractional(QQ(bar_a_ij))) for bar_a_ij in row_data]
-        sage_mip_obj =  [QQ(bar_cj) for bar_cj in self._MIP_objective]
-        # To do, figure out vector solver type conversion. 
         raise NotImplementedError
         # return self._cut_score.cut_score_grad(sage_cut, sage_mip_obj)
     
     @staticmethod
     def hess(parameters):
-        if self._MIP_objective is None:
-            raise UnsetData("Set MIP_objective before use of CutScore.")
-        if self._MIP_row is None:
-            raise UnsetData("Set MIP_row before use of CutScore.")
-        if self._sage_to_solver_type is None:
-            raise UnsetData("Set sage_to_solver_type before use of CutScore.")
-        bkpt = [QQ(b) for b in parameters[:len(parameters)/2]]
-        val = [QQ(v) for v in parameters[len(parameters)/2:]]
-        pi = piecewise_function_from_breakpoints_and_values(bkpt + [1], val + [0])
-        row_data = self.get_MIP_row()
-        sage_cut = [pi(fractional(QQ(bar_a_ij))) for bar_a_ij in row_data]
-        sage_mip_obj =  [QQ(bar_cj) for bar_cj in self._MIP_objective]
         raise NotImplementedError
         # return self._cut_score.cut_score_hess(sage_cut, sage_mip_obj)
+
+### Get and set methods for communicating data between solvers.
+
+    def get_current_cell(self):
+        return self._cell
+
+    def get_espilon(self):
+        return self._espilon
+
+    def get_f_index(self):
+        return self._f_index
+    
+    def get_f_trust(self):
+        return self._f_trust
+    
+    def get_feasible_point(self):
+        return self._feasible_point
+
+    def get_lipschitz_constant(self):
+        return self._M
+    
+    def get_MIP_obj(self):
+        return self._MIP_objective
+
+    def get_MIP_row(self):
+        """
+        For fixed row i of the corner polyhedron;  bar_i - (bar a_i)^T x_N 
+        """
+        return self._MIP_row
+    
+    def get_sage_to_solver_type(self):
+        """
+        Defined in the cutGenerationSolver. This method is only indeded to be set and unset by solving
+        routines in cutGenerationSolver. 
+        """
+        return self._sage_to_solver_type
+    
+    def set_current_cell(self, cell):
+        self._cell = cell
+
+    def set_espilon(self, espilon):
+        self._espilon = espilon
+
+    def set_f_index(self, f_index):
+        self._f_index = f_index
+    
+    def set_f_trust(self, f_trust):
+        self._f_trust = f_trust
+    
+    def set_feasible_point(self, point):
+        self._feasible_point = point    
+
+    def set_MIP_row(self, new_row):
+        self._MIP_row = new_row
 
     def set_MIP_obj(self, new_objective):
         """
@@ -191,24 +227,8 @@ class cutScore:
         """
         self._MIP_objective = new_objective
 
-    def get_MIP_obj(self):
-        return self._MIP_objective
-
-    def get_MIP_row(self):
-        """
-        For fixed row i of the corner polyhedron;  bar_i - (bar a_i)^T x_N 
-        """
-        return self._MIP_row
-
-    def set_MIP_row(self, new_row):
-        self._MIP_row = new_row
-
-    def get_sage_to_solver_type(self):
-        """
-        Defined in the cutGenerationSolver. This method is only indeded to be set and unset by solving
-        routines in cutGenerationSolver. 
-        """
-        return self._sage_to_solver_type
+    def set_lipschitz_constant(self, M):
+        self._M = M
 
     def set_sage_to_solver_type(self, new_conversion):
         self._sage_to_solver_type = new_conversion
@@ -216,6 +236,88 @@ class cutScore:
     def cut_obj_type(self):
          self._cut_obj_type
 
+    def validate_point(self, point):
+        """
+        Take parameters from the non linear solver and returns point that satasfies the minimal function model.
+        """
+        epsilon = self._espilon 
+        M = self._M
+        f_index = self._f_index
+        f_trust = fractional(QQ(self._f_trust))
+        cell = self._cell
+        sage_point = [QQ(x) for x in point]
+        # Add logger object/method
+        n = len(point)/2
+        b, v  = [b for b in  sage_point[:n]], [v for v in sage_point[n:]]
+        # model assumptions
+        # pi(0) = 0, pi(f) = 1
+        if abs(b[0]-0) <= epsilon:
+            b[0] = 0
+        else:
+            raise FeasiblityError("breakpoint lambda_0 >0")
+        if abs(b[f_index] - f_trust) <= epsilon:
+            b[f_index] = f_trust
+        else:
+            raise FeasiblityError(f"breakpoint lambda_{f_index} != {f_trust}")
+        if abs(v[f_index] - 1) <= epsilon:
+            v[f_index] = 1
+        else:
+            raise FeasiblityError(f"value gamma_{f_index} != 1")
+        # lipschitz constant and contunity. 
+        for i in range(n-1):
+            if 0 < b[i+1]-b[i] <= epsilon:
+                if abs(v[i+1]-v[i]) >= epsilon*M:
+                    # potential discontunity
+                    # not in (epsilon_i, M) - charts. 
+                    raise FeasiblityError(f"Solution does not have lipschitz constant {M}")
+                # lambda_i+1 = lambda_i
+                b[i+1] = b[i]
+                # contunity, gamma_i =gamma_i+1
+                if abs(v[i+1]-v[i]) < epsilon:
+                    v[i+1] = v[i]
+                # when epsilon <= v[i+1]-v[i] < epsilon*M
+                # the solution exists in the intersection of the epsilon,M
+                # can assume the values are correct/as intended
+        # the last breakpoint should be distinct from 1 to enforce a breakpoint sequence.
+        if 1-b[n-1] <= epsilon:
+            raise FeasiblityError(f"breakpoint lambda_{n-1} >= 1")
+        # b,v are rounded values.
+        # ensure constraints hold
+        # For a polynomial constraint, poly, assume poly(b,v) = 0. Then poly(point) = poly((b,v) + O(epsilon))
+        # implies  poly(point) = poly((b,v) + O(epsilon)) = poly(b,v) + total_deriv(poly)( point)+O(epspsilon)) + O(epsilon^2)
+        # We treat episolon^2 -> 0. Hence poly(point) = total_deriv(poly)(O(epsilon)) <= total_deriv(poly)(epsilon)
+        # the above does not hold, then poly(b,v) != 0.   
+
+        # note the polynomial parents should have variable names lambda_0,...,lambda_n-1, gamma_0,...,gamma_n-1 in order.
+        # hence we can lazily evaluate polys from the cell.
+        for poly in cell.lt_poly():
+            poly_val = poly(b+v) 
+            if poly_val < -1*epsilon:
+                pass
+            else:
+                if poly_val < 0:
+                    # see if poly_val == 0 or not.
+                    # assume poly(b+v) == 0. 
+                    # 
+                    if abs(poly(sage_point)) <= sum(abs(grad(sage_point)) for grad in poly.gradient())*epsilon:
+                        raise FeasiblityError(f"{poly} evaluated at {b+v} == 0 when {poly} evaluated at {b+v} should be < 0")
+                    else:
+                        pass
+                else:
+                    raise FeasiblityError(f"{poly} evaluated at {b+v} >= 0 when {poly} evaluated at {b+v} should be < 0")
+        for poly in cell.le_poly():
+            if poly(b+v) > 0:
+                raise FeasiblityError(f"{poly} evaluated at {b+v} >0 when {poly} evaluated at {b+v} should be <= 0")      
+            
+        for poly in cell.eq_poly():
+            if abs(poly(b+v)) >= epsilon or abs(poly(sage_point)) > sum(abs(grad(sage_point)) for grad in poly.gradient())*epsilon:
+                raise FeasiblityError(f"{poly} evaluated at {b+v} != 0 when {poly} evaluated at {b+v} should be == 0")
+        return b,v
+        # else:
+        #     # TODO: Try to do some error correcting, restart in this case. 
+        #     # We can try a restart counter, which assumes the breakpoints are "correct"
+        #     # but the values maybe have some issue.
+        #     raise FeasiblityError(f"pi_({b,v}) is not minimal.")
 
 class Parallelism(abstractCutScore):
     """
@@ -251,7 +353,7 @@ class cutGenerationProblem:
     Option: cut_score = parallelism, steepestdirection, scip, or custom
     Option: multithread = notImplemented
     """
-    def __init__(self, algorithm=None, cut_score=None, num_bkpt=None, solver=None, multithread=False):
+    def __init__(self, algorithm=None, cut_score=None, num_bkpt=None, solver=None, multithread=False, epsilon=10**-7, M = 10**7):
         if algorithm is None:
             self._algorithm = "full"
         else:
@@ -293,6 +395,9 @@ class cutGenerationProblem:
         """
         self._cut_score.set_MIP_row(binvarow)
         self._cut_score.set_MIP_obj(binvc)
+        self._cut_score.set_espilon(10**-7)
+        self._cut_score.set_lipschitz_constant(10**6)
+        self._cut_score.set_f_trust(f)
         frac_f = fractional(QQ(f))
         def cut_score(params):
             return self._cut_score(params)
@@ -300,7 +405,7 @@ class cutGenerationProblem:
         best_value = -1*np.inf
         # else: #To do implement minimze options
         #     raise NotImplementedError
-        best_result = None
+        solution_for_best_result = None
         if self._cut_space is None: # load the semi algebraic descriptions. 
              if self._num_bkpt > max_bkpts:
                 raise ValueError("The Minimal Functions Cache for {} breakpoints requested has not been computed.".format(self._num_bkpt))
@@ -312,6 +417,7 @@ class cutGenerationProblem:
             # pi(f) = 1; 
             pi_test = piecewise_function_from_breakpoints_and_values(b+[1], v+[0])
             bsa_f_index = find_f_index(pi_test)
+            self._cut_score.set_f_index(bsa_f_index)
             bkpt_bsa = nnc_poly_from_bkpt_sequence(b)
             lambda_f_index = bkpt_bsa.polynomial_map()[0].parent().gens()[bsa_f_index]
             bkpt_bsa.add_polynomial_constraint(lambda_f_index - frac_f, operator.eq)
@@ -319,36 +425,47 @@ class cutGenerationProblem:
                 if not bkpt_bsa.upstairs().is_empty():
                     b0 = list(bkpt_bsa.find_point())
                     v0 = list(value_nnc_polyhedron(b0, bsa_f_index).find_point())
-                    x0 = b0[1:]+v0[1:] # a reasonable inital guess which satasfies the constraint lambda_f_index == f.
-                    # specify explicitly gamma_0 == lambda_0 == 0 in the call of the cut score function
-                    # here we should ignore these parameters from the perspective of the solver.
-                    subdomain_with_f_constraint = bsa_of_rep_element_pi_of_0_not_param(b0, v0)
+                    # A feasible solution for cell problem has been found.
+                    point = b0+v0
+                    self._cut_score.set_feasible_point(point)
+                    subdomain_with_f_constraint = bsa_of_rep_element(b0, v0)
                     lambda_f_index = subdomain_with_f_constraint.polynomial_map()[0].parent().gens()[bsa_f_index]
                     lhs =  lambda_f_index - frac_f
                     subdomain_with_f_constraint.add_polynomial_constraint(lhs, operator.eq)
+                    self._cut_score.set_current_cell(subdomain_with_f_constraint)
                     subdomain_solver_constraints = self._solver.write_nonlinear_constraints_from_bsa(subdomain_with_f_constraint)
-                    subproblem_result = self._solver.nonlinear_solve(cut_score, x0, subdomain_solver_constraints)
-                    if best_result is None: # set a known result, should be a GMIC function at the least, and once should be discovered.
-                        best_result = subproblem_result
-                    if best_value < subproblem_result[1]:
-                        best_value = subproblem_result[1]
-                        best_result = subproblem_result
-                    if subproblem_result[0] is True:
+                    # Call a NL solver, attempt to solve the cell optimization problem.
+                    try:
+                        self._solver.nonlinear_solve(cut_score, point, subdomain_solver_constraints)
+                    except FeasiblityError:
                         pass
-                    # else:
-                    #     logging.warning(f"The solver reports a failure {subproblem_result}")
+                    # When a FeasiblityError is encountered 
+                    # the NL solver has violated a constraint of the model or minimality
+                    # within the cell. Use the last known feasible point from the 
+                    # solver.
+                    point = self._cut_score.get_feasible_point() 
+                    value_for_cell = self._cut_score(point)
+                    if solution_for_best_result is None:
+                        best_result = value_for_cell
+                        solution_for_best_result = point
+                        rep_elem_of_best_cell = b+v
+                    if best_value < value_for_cell:
+                        best_value = value_for_cell
+                        solution_for_best_result = point
+                        rep_elem_of_best_cell = b+v
             except EmptyBSA:
                 pass
-        # if result is None, the solver has failed to find any meaninful result. 
+        # If result is None, the solver has failed to find any meaninful result. 
         # There should always be a result and the SolverError should never be raised.
         if best_result is None:
-            raise SolverError("the solver has failed, we should always get a result from the computaiton.")
-        vals_result = [QQ(lambda_i) for lambda_i in best_result[2][self._num_bkpt-1:]]
-        bkpt_result = [QQ(gamma_i) for gamma_i in best_result[2][ : self._num_bkpt-1]]
-        pi_p = piecewise_function_from_breakpoints_and_values([0]+bkpt_result+[1],[0]+vals_result+[0])
-        logging.info(f"The solver reports the following problem status for solving the row problem: {best_result}")
-        logging.info(f"The found cgf is {pi_p}")
-        print(f"Found an optimal cgf {pi_p}")
+            raise SolverError("The solver has failed, we should always get a result from the computaiton.")
+        val_result = [QQ(gamma_i) for gamma_i in solution_for_best_result[self._num_bkpt:]]
+        bkpt_result = [QQ(lambda_i) for lambda_i in solution_for_best_result[:self._num_bkpt]]
+        pi_p = piecewise_function_from_breakpoints_and_values(bkpt_result+[1],val_result+[0])
+        # logging.INFO(f"The solver reports the following problem status for solving the row problem: {solution_for_best_result}")
+        # logging.INFO(f"The found cgf is {pi_p}")
+        print(bkpt_result, val_result, binvarow, binvc, f)
+        minimality_test(pi_p, True)
         return pi_p
 
     def _algorithm_bkpt_as_param(self, binvarow, binvc, f):
