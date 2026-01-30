@@ -347,25 +347,29 @@ class cutGenerationProblem:
     
     The cutGenerationProblem options are listed below.
     
-    Option: row selection: all_rows mathcal I = {i \in B : overline{b_i} \not \in ZZ}, lex_row = min  mathcal I, random row, rand(mathcal I), subset (any subset of mathcal I)
-    Option: row algorithm = full space; bkpt as param: full (all combinatorial data, if needed k<n-m),  max, lex (selects lexicographically first parameter data k< n-m), or rand (randomly select parameter data)
-    Option: num_bkpt = full space: k <= max_bkpts; bkpt as param: full, lex rand, k <= n-m; max, k = n-m
+    Option: row algorithm = full; bkpt_as_param
+    Option: num_bkpt = full: k <= max_bkpts
     Option: cut_score = parallelism, steepestdirection, scip, or custom
     Option: multithread = notImplemented
     """
-    def __init__(self, algorithm=None, cut_score=None, num_bkpt=None, solver=None, multithread=False, epsilon=10**-7, M = 10**7):
-        if algorithm is None:
-            self._algorithm = "full"
+    def __init__(self, algorithm_name=None, cut_score=None, num_bkpt=None, solver=None, multithread=False, epsilon=10**-7, M = 10**7):
+        if algorithm_name is None or algorithm_name.lower() == "full":
+            self._algorithm_name = "full"
+            if num_bkpt is None or num_bkpt < 1 or num_bkpt > max_bkpt:
+                raise ValueError(f"Incorrect number of breakpoints defined for full algorithm. 2 <= num_bkpt <= {max_bkpt}.")
+            self._num_bkpt = num_bkpt
+            self._cut_space = None
+        elif algorithm_name.lower() == "bkpt_as_param":
+            self._algorithm_name = "bkpt_as_param"
         else:
-            self._algorithm = algorithm
+            raise ValueError("No other algorithms are supported at this time.")
         if cut_score is None:
             self._cut_score = cutScore(SteepestDirection)
         else:
-            self._cut_score = cut_score
-        if num_bkpt is None or num_bkpt < 1:
-            raise ValueError("At least two breakpoints are required. Please specify a number of breakpoints.")
-        else:
-            self._num_bkpt = num_bkpt
+            try:
+                self._cut_score = cutScore(cut_score)
+            except NameError:
+                raise ValueError("Ya cut score is whack.")
         if solver is None:
             self._solver = scipyCutGenProbelmSolverInterface
         else:
@@ -383,10 +387,10 @@ class cutGenerationProblem:
         """
         # assume MIP is a scip model; really we should be passing in and LP relaxation with variable infomation here.
         # The cut generation problem 
-        if self._algorithm == "full":
+        if self._algorithm_name == "full":
             cgf = self._algorithm_full_space(binvarow, binvc, f)
-        elif self._algorithm == "bkpt as param, full":
-            cgf = self._algorithm_bkpt_as_param_full(binvarow, binvc, f)
+        elif self._algorithm_name == "bkpt_as_param":
+            cgf = self._algorithm_bkpt_as_param(binvarow, binvc, f)
         return cgf
 
     def _algorithm_full_space(self, binvarow, binvc, f):
@@ -424,7 +428,7 @@ class cutGenerationProblem:
             try:
                 if not bkpt_bsa.upstairs().is_empty():
                     b0 = list(bkpt_bsa.find_point())
-                    v0 = list(value_nnc_polyhedron(b0, bsa_f_index).find_point())
+                    v0 = list(value_nnc_polyhedron_value_cords(b0, bsa_f_index).find_point())
                     # A feasible solution for cell problem has been found.
                     point = b0+v0
                     self._cut_score.set_feasible_point(point)
@@ -474,25 +478,45 @@ class cutGenerationProblem:
         """
         self._cut_score.set_MIP_row(binvarow)
         self._cut_score.set_MIP_obj(binvc)
+        self._cut_score.set_espilon(10**-7)
+        self._cut_score.set_lipschitz_constant(10**6)
+        self._cut_score.set_f_trust(f)
+        frac_f = fractional(QQ(f))
         def cut_score(params):
             return self._cut_score(params)
-        frac_f = fractional(QQ(f))
         symmetrized_bkpts = [0, frac_f]
+        # symmertized breakpoints should all be in [0,1)
         for b in binvarow:
-            b_sym = frac_f - b 
+            sage_b = fractional(QQ(b))
+            b_sym = frac_f - sage_b
             if b_sym > 0:
-                symmetrized_bkpts += [b, b_sym]
+                symmetrized_bkpts += [sage_b, b_sym]
             elif b_sym < 0:
-                symmetrized_bkpts += [b, 1+b_sym]
+                symmetrized_bkpts += [sage_b, 1+b_sym]
+        symmetrized_bkpts = unique_list(symmetrized_bkpts)
+        num_bkpt = len(symmetrized_bkpts)
+        if num_bkpt == 2:
+            # put a logging step here.
+            # return gmic, the feasible set for the optimization problem is a singlton which corrosponds to gmic.
+            return gmic(frac_f)
         symmetrized_bkpts.sort()
         f_index = symmetrized_bkpts.index(frac_f)
-        value_polyhedron =  value_nnc_polyhedron_gamma_0_not_as_param(symmetrized_bkpts, f_index)
-        v0 = list(value_polyhedron.find_point())
-        # Optimize over value polyhedron only; ignore the 0 constraint.
-        value_cons = write_linear_constraints_from_bsa(value_polyhedron)
-        result = self._solver.nonlinear_solve(cut_score, v0[1:], value_cons)       
-        vals_result = [QQ(lambda_i) for lambda_i in best_result[2]]
-        pi_p = piecewise_function_from_breakpoints_and_values([0]+bkpt_result+[1],[0]+vals_result+[0])
+        self._cut_score.set_f_index(f_index)
+        value_polyhedron =  value_nnc_polyhedron(symmetrized_bkpts, f_index)
+        point = list(value_polyhedron.find_point())
+        # initalize a feasible point for the cut scoring funciton to remember.
+        self._cut_score.set_feasible_point(point)
+        self._cut_score.set_current_cell(value_polyhedron)
+        value_polyhedron_constraints = self._solver.write_linear_constraints_from_bsa(value_polyhedron)
+        try:
+            result = self._solver.nonlinear_solve(cut_score, point, value_polyhedron_constraints)
+        except FeasiblityError:
+            pass
+        result_point = self._cut_score.get_feasible_point()  # this should always be defined.
+        val_result = [QQ(gamma_i) for gamma_i in point[num_bkpt:]]
+        bkpt_result = [QQ(lambda_i) for lambda_i in point[:num_bkpt]]
+        pi_p = piecewise_function_from_breakpoints_and_values(bkpt_result+[1], val_result+[0])
+        minimality_test(pi_p,True)
         return pi_p
 
     def _algorithm_bkpt_as_param_full_steepest_dir(self, binvarow, binvc, f):
@@ -503,6 +527,7 @@ class cutGenerationProblem:
         Input: row data and cost data.
         Output: minimal function
         """
+        # everthing that is written in one of this 
         raise NotImplementedError
 
 
@@ -647,9 +672,9 @@ class scipyCutGenProbelmSolverInterface(abstractCutGenProblemSolverInterface):
 
 
 class OptimalCut(Sepa):
-    def __init__(self, use_k_bkpts=2, algorithm=None, cut_scoring_method=None, solver=None):
+    def __init__(self, use_k_bkpts=None, algorithm_name=None, cut_scoring_method=None):
         self.ncuts = 0
-        self.cgp = cutGenerationProblem(algorithm=algorithm, cut_score=cut_scoring_method, num_bkpt=use_k_bkpts, solver=solver)
+        self.cgp = cutGenerationProblem(algorithm_name=algorithm_name, cut_score=cut_scoring_method, num_bkpt=use_k_bkpts)
     def getOptimalCutFromRow(self, cols, rows, binvrow, binvarow, primsol, pi_p):
         """ Given the row (binvarow, binvrow) of the tableau, computes optimized cut
 
