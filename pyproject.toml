@@ -6,12 +6,15 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "minimalfunctioncache"
+name = "MinimalFunctionCache"
 description = "Experimental Cut and Branch solver using optimal cut selection via parameterized cut generating functions."
 authors = [
     {name = "Acadia Larsen", email = "acadia.larsen@gmail.com"},
 ]
-dependencies = [cutgeneratingfunctionology]
+dependencies = [
+"cutgeneratingfunctionology",
+ "scipy", 
+ "pyscipopt"]
 requires-python = ">=3.9"
 license = "GPL-2.0-or-later"
 keywords = ["integer programming", "cutting planes"]

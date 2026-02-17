@@ -1,6 +1,11 @@
 from cutgeneratingfunctionology.igp import *
 from scipy.optimize import minimize, LinearConstraint, NonlinearConstraint
 from pyscipopt import Model, Sepa, SCIP_RESULT
+import logging
+
+cut_gen_logger = logging.getLogger(__name__)
+
+minimal_function_cashe_logging = True
 
 max_bkpts = 4
                       
@@ -236,32 +241,36 @@ class cutScore:
     def cut_obj_type(self):
          self._cut_obj_type
 
-    def validate_point(self, point):
+    def validate_point(self, point, poly_check=False):
         """
         Take parameters from the non linear solver and returns point that satasfies the minimal function model.
         """
+        # This enforces the "manifoldness" of PWL.
         epsilon = self._espilon 
         M = self._M
         f_index = self._f_index
         f_trust = fractional(QQ(self._f_trust))
         cell = self._cell
         sage_point = [QQ(x) for x in point]
-        # Add logger object/method
         n = len(point)/2
         b, v  = [b for b in  sage_point[:n]], [v for v in sage_point[n:]]
         # model assumptions
         # pi(0) = 0, pi(f) = 1
+        # we log all errors
         if abs(b[0]-0) <= epsilon:
             b[0] = 0
         else:
+            cut_gen_logger.error(f"validate_point: breakpoint lambda_0 >0, point: {point}, cell: {cell}")
             raise FeasiblityError("breakpoint lambda_0 >0")
         if abs(b[f_index] - f_trust) <= epsilon:
             b[f_index] = f_trust
         else:
+            cut_gen_logger.error(f"validate_point: breakpoint lambda_{f_index} != {f_trust}: point: {point}, cell: {cell}")
             raise FeasiblityError(f"breakpoint lambda_{f_index} != {f_trust}")
         if abs(v[f_index] - 1) <= epsilon:
             v[f_index] = 1
         else:
+            cut_gen_logger.error(f"validate_point: breakpoint lambda_{f_index} !=1: point: {point}, cell: {cell}")
             raise FeasiblityError(f"value gamma_{f_index} != 1")
         # lipschitz constant and contunity. 
         for i in range(n-1):
@@ -269,6 +278,7 @@ class cutScore:
                 if abs(v[i+1]-v[i]) >= epsilon*M:
                     # potential discontunity
                     # not in (epsilon_i, M) - charts. 
+                    cut_gen_logger.error(f"validate_point: Solution does not have lipschitz constant {M}: point: {point}, cell: {cell}")
                     raise FeasiblityError(f"Solution does not have lipschitz constant {M}")
                 # lambda_i+1 = lambda_i
                 b[i+1] = b[i]
@@ -280,6 +290,7 @@ class cutScore:
                 # can assume the values are correct/as intended
         # the last breakpoint should be distinct from 1 to enforce a breakpoint sequence.
         if 1-b[n-1] <= epsilon:
+            cut_gen_logger.error(f"validate_point: breakpoint lambda_{n-1} >= 1: point: {point}, cell: {cell}")
             raise FeasiblityError(f"breakpoint lambda_{n-1} >= 1")
         # b,v are rounded values.
         # ensure constraints hold
@@ -290,28 +301,34 @@ class cutScore:
 
         # note the polynomial parents should have variable names lambda_0,...,lambda_n-1, gamma_0,...,gamma_n-1 in order.
         # hence we can lazily evaluate polys from the cell.
-        for poly in cell.lt_poly():
-            poly_val = poly(b+v) 
-            if poly_val < -1*epsilon:
-                pass
-            else:
-                if poly_val < 0:
-                    # see if poly_val == 0 or not.
-                    # assume poly(b+v) == 0. 
-                    # 
-                    if abs(poly(sage_point)) <= sum(abs(grad(sage_point)) for grad in poly.gradient())*epsilon:
-                        raise FeasiblityError(f"{poly} evaluated at {b+v} == 0 when {poly} evaluated at {b+v} should be < 0")
-                    else:
-                        pass
+        # this does not seem to make a difference so it should be safe to ignore. 
+        if poly_check:
+            # Set poly_check to true to prove within the chart used, the constraints hold. 
+            for poly in cell.lt_poly():
+                poly_val = poly(b+v) 
+                if poly_val < -1*epsilon:
+                    pass
                 else:
-                    raise FeasiblityError(f"{poly} evaluated at {b+v} >= 0 when {poly} evaluated at {b+v} should be < 0")
-        for poly in cell.le_poly():
-            if poly(b+v) > 0:
-                raise FeasiblityError(f"{poly} evaluated at {b+v} >0 when {poly} evaluated at {b+v} should be <= 0")      
-            
-        for poly in cell.eq_poly():
-            if abs(poly(b+v)) >= epsilon or abs(poly(sage_point)) > sum(abs(grad(sage_point)) for grad in poly.gradient())*epsilon:
-                raise FeasiblityError(f"{poly} evaluated at {b+v} != 0 when {poly} evaluated at {b+v} should be == 0")
+                    if poly_val < 0:
+                        # see if poly_val == 0 or not.
+                        # assume poly(b+v) == 0. 
+                        if abs(poly(sage_point)) <= sum(abs(grad(sage_point)) for grad in poly.gradient())*epsilon:
+                            cut_gen_logger.error(f"validate_point: {poly} evaluated at {b+v} == 0 when {poly} evaluated at {b+v} should be < 0: point: {point}, cell: {cell}")
+                            raise FeasiblityError(f"{poly} evaluated at {b+v} == 0 when {poly} evaluated at {b+v} should be < 0")
+                        else:
+                            pass
+                    else:
+                        cut_gen_logger.error(f"validate_point: {poly} evaluated at {b+v} >= 0 when {poly} evaluated at {b+v} should be < 0: point: {point}, cell: {cell}")
+                        raise FeasiblityError(f"{poly} evaluated at {b+v} >= 0 when {poly} evaluated at {b+v} should be < 0")
+            for poly in cell.le_poly():
+                if poly(b+v) > 0:
+                    cut_gen_logger.error(f"validate_point: {poly} evaluated at {b+v} >0 when {poly} evaluated at {b+v} should be <=  0: point: {point}, cell: {cell}")
+                    raise FeasiblityError(f"{poly} evaluated at {b+v} >0 when {poly} evaluated at {b+v} should be <= 0")      
+                
+            for poly in cell.eq_poly():
+                if abs(poly(b+v)) >= epsilon or abs(poly(sage_point)) > sum(abs(grad(sage_point)) for grad in poly.gradient())*epsilon:
+                    cut_gen_logger.error(f"validate_point:{poly} evaluated at {b+v} != 0 when {poly} evaluated at {b+v} should be == 0: point: {point}, cell: {cell}")
+                    raise FeasiblityError(f"{poly} evaluated at {b+v} != 0 when {poly} evaluated at {b+v} should be == 0")
         return b,v
         # else:
         #     # TODO: Try to do some error correcting, restart in this case. 
@@ -352,15 +369,19 @@ class cutGenerationProblem:
     Option: cut_score = parallelism, steepestdirection, scip, or custom
     Option: multithread = notImplemented
     """
-    def __init__(self, algorithm_name=None, cut_score=None, num_bkpt=None, solver=None, multithread=False, epsilon=10**-7, M = 10**7):
+    def __init__(self, algorithm_name=None, cut_score=None, num_bkpt=None, multithread=False, prove_seperator=False, epsilon=10**-7, M = 10**7):
         if algorithm_name is None or algorithm_name.lower() == "full":
             self._algorithm_name = "full"
             if num_bkpt is None or num_bkpt < 1 or num_bkpt > max_bkpt:
                 raise ValueError(f"Incorrect number of breakpoints defined for full algorithm. 2 <= num_bkpt <= {max_bkpt}.")
             self._num_bkpt = num_bkpt
             self._cut_space = None
+            self._solver = scipyCutGenProbelmSolverInterface
         elif algorithm_name.lower() == "bkpt_as_param":
             self._algorithm_name = "bkpt_as_param"
+            self._solver = scipyCutGenProbelmSolverInterface
+        elif algorithm_name.lower() == "value_poly_lp":
+            self._algorithm_name = "value_poly_lp"
         else:
             raise ValueError("No other algorithms are supported at this time.")
         if cut_score is None:
@@ -370,12 +391,9 @@ class cutGenerationProblem:
                 self._cut_score = cutScore(cut_score)
             except NameError:
                 raise ValueError("Ya cut score is whack.")
-        if solver is None:
-            self._solver = scipyCutGenProbelmSolverInterface
-        else:
-            self._solver = solver
         self._cut_score.set_sage_to_solver_type(self._solver.sage_to_solver_type)
         self._cut_space = None
+        self._prove_seperator = prove_seperator
 
     def solve(self, binvarow, binvc, f):
         r"""Solves the paramaterized problem. 
@@ -391,6 +409,8 @@ class cutGenerationProblem:
             cgf = self._algorithm_full_space(binvarow, binvc, f)
         elif self._algorithm_name == "bkpt_as_param":
             cgf = self._algorithm_bkpt_as_param(binvarow, binvc, f)
+        elif self._algorithm_full_space == "value_poly_lp":
+            cgf = self._algorithm_value_poly_lp(binvarow, binvc, f)
         return cgf
 
     def _algorithm_full_space(self, binvarow, binvc, f):
@@ -466,10 +486,10 @@ class cutGenerationProblem:
         val_result = [QQ(gamma_i) for gamma_i in solution_for_best_result[self._num_bkpt:]]
         bkpt_result = [QQ(lambda_i) for lambda_i in solution_for_best_result[:self._num_bkpt]]
         pi_p = piecewise_function_from_breakpoints_and_values(bkpt_result+[1],val_result+[0])
-        # logging.INFO(f"The solver reports the following problem status for solving the row problem: {solution_for_best_result}")
-        # logging.INFO(f"The found cgf is {pi_p}")
-        print(bkpt_result, val_result, binvarow, binvc, f)
-        minimality_test(pi_p, True)
+        cut_gen_logger.info(f"{pi_p} is the found function for the row: {binvarow}, objective:{binvc},and f{f}")
+        if self._prove_seperator:
+            res = minimality_test(pi_p) # add someway to log certificates. 
+            cut_gen_logger.info(f"minimality of  {pi_p}: {res}")
         return pi_p
 
     def _algorithm_bkpt_as_param(self, binvarow, binvc, f):
@@ -496,9 +516,14 @@ class cutGenerationProblem:
         symmetrized_bkpts = unique_list(symmetrized_bkpts)
         num_bkpt = len(symmetrized_bkpts)
         if num_bkpt == 2:
-            # put a logging step here.
+            cut_gen_logger.warning(f"The row {binvarow} fails to have a non-trivail value polyhedron.")
+            pi_p =  gmic(frac_f)
+            cut_gen_logger.info(f"{pi_p} is the found function for the row: {binvarow}, objective:{binvc},and f{f}")
+            if self._prove_seperator:
+                # we always have a seperator here.
+                cut_gen_logger.info(f"minimality of  {pi_p}: {True}")
             # return gmic, the feasible set for the optimization problem is a singlton which corrosponds to gmic.
-            return gmic(frac_f)
+            return pi_p
         symmetrized_bkpts.sort()
         f_index = symmetrized_bkpts.index(frac_f)
         self._cut_score.set_f_index(f_index)
@@ -516,11 +541,57 @@ class cutGenerationProblem:
         val_result = [QQ(gamma_i) for gamma_i in point[num_bkpt:]]
         bkpt_result = [QQ(lambda_i) for lambda_i in point[:num_bkpt]]
         pi_p = piecewise_function_from_breakpoints_and_values(bkpt_result+[1], val_result+[0])
-        minimality_test(pi_p,True)
+        cut_gen_logger.info(f"{pi_p} is the found function for the row: {binvarow}, objective:{binvc},and f{f}")
+        if self._prove_seperator:
+            res = minimality_test(pi_p) # add someway to log certificates. 
+            cut_gen_logger.info(f"minimality of  {pi_p}: {res}")
         return pi_p
 
-    def _algorithm_bkpt_as_param_full_steepest_dir(self, binvarow, binvc, f):
+    def _algorithm_value_poly_lp(self, binvarow, binvc, f):
         raise NotImplementedError
+        frac_f = fractional(QQ(f))
+        symmetrized_bkpts = [0, frac_f]
+        # symmertized breakpoints should all be in [0,1)
+        for b in binvarow:
+            sage_b = fractional(QQ(b))
+            b_sym = frac_f - sage_b
+            if b_sym > 0:
+                symmetrized_bkpts += [sage_b, b_sym]
+            elif b_sym < 0:
+                symmetrized_bkpts += [sage_b, 1+b_sym]
+        symmetrized_bkpts = unique_list(symmetrized_bkpts)       
+        num_bkpt = len(symmetrized_bkpts)
+        if num_bkpt == 2:
+            # put a logging step here.
+            # return gmic, the feasible set for the optimization problem is a singlton which corrosponds to gmic.
+            return gmic(frac_f)
+        symmetrized_bkpts.sort()
+        f_index = symmetrized_bkpts.index(frac_f)
+        # write value names
+        coord_names = []
+        val = [None]*(num_bkpt)
+        for i in range(num_bkpt):
+            coord_names.append('gamma'+str(i))
+        K.gens()[0] == 0
+        for i in range(1, num_bkpt):
+            K.gens()[i] <=1
+            K.gens()[i] > 0
+        pi = piecewise_function_from_breakpoints_and_values(bkpt + [1], K.gens() + [0], merge=False)
+        paramaterized_objective_function = sum(pi(QQ(b))*QQ(c) for b, c in zip(binvarow, binvc))
+        # objective as a linear function of value parameters
+        value_paramater_coeffs = paramaterized_objective_function.coefficients()
+        lp_obj_in_solver_type =  [self._solver.sage_to_solver_type(obj_coeff) for obj_coeff in value_paramater_coeffs]
+        val_poly = value_nnc_polyhedron_value_cords(bkpt, f_index)
+        # now construct LP
+        cons = self._solver.write_linear_constraints_from_bsa(val_poly)
+        result = self._solver.lp_solve(cons, lp_obj_in_solver_type)
+        vals = [QQ(v) for v in result]
+        pi_p = piecewise_function_from_breakpoints_and_values(bkpt + [1], vals+ [0])
+        cut_gen_logger.info(f"{pi_p} is the found function for the row: {binvarow}, objective:{binvc},and f{f}")
+        if self._prove_seperator:
+            res = minimality_test(pi_p) # add someway to log certificates. 
+            cut_gen_logger.info(f"minimality of  {pi_p}: {res}")
+        return pi_p
         
     def _algorithm_custom(self, binvarow, binvc, f):
         """
@@ -580,13 +651,49 @@ class abstractCutGenProblemSolverInterface:
 class scipyCutGenProbelmSolverInterface(abstractCutGenProblemSolverInterface):
     """
     Interfaces types and objects from ``cutgeneratingfunctiology`` to scipy. 
+    
+    
     """
     @staticmethod
-    def write_linear_constraints_from_bsa(bsa, epsilon=10**-9): # think about aspects of exactness; 
+    def write_linear_constraints_from_bsa(bsa, epsilon=10**-9):
         r"""
         Given a BSA with only linear constraints, converts the bsa object into a format that the underlying solver can use.
         """ 
-        pass
+        # 
+        lb = []
+        ub = []
+        A = []
+        for polynomial in bsa.eq_poly():
+            if polynomial.degree() != 1:
+                raise ValueError(f"Constraint {polynomial} == 0 is not linear.")
+            linear_coeffs = [polynomial.coefficient(i) for i in polynomial.parent().gens()]
+            A.append(linear_coeffs)
+            # polys in bsa are written poly op 0
+            # rewrite to correct scipy notation.
+            constant = -1*polynomial.constant_coefficient() 
+            lb.append(constant)
+            ub.append(constant)
+        for polynomial in bsa.lt_poly():
+            if polynomial.degree() != 1:
+                raise ValueError(f"Constraint {polynomial} < 0 is not linear.")
+            linear_coeffs = [polynomial.coefficient(i) for i in polynomial.parent().gens()]
+            A.append(linear_coeffs)
+            # mimic in a non-rigrous way <
+            constant = -1*polynomial.constant_coefficient() - epsilon
+            lb.append(-np.inf)
+            ub.append(constant)            
+        for polynomial in bsa.le_poly():
+            if polynomial.degree() != 1:
+                raise ValueError(f"Constraint {polynomial} < 0 is not linear.")
+            linear_coeffs = [polynomial.coefficient(i) for i in polynomial.parent().gens()]
+            A.append(linear_coeffs)
+            constant = -1*polynomial.constant_coefficient()
+            lb.append(-np.inf)
+            ub.append(constant)
+        lb = np.array(lb)
+        ub = np.array(ub)
+        A = np.array(A)
+        return LinearConstraint(A, lb, ub)
 
     @staticmethod       
     def write_nonlinear_constraints_from_bsa(bsa, epsilon=10**-9):
