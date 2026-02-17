@@ -1,6 +1,6 @@
 from setuptools import setup
 
 setup(
-    packages = ['cutgeneratingfunctionology', 'cutgeneratingfunctionology.igp', 'cutgeneratingfunctionology.spam'],
+    packages = ['cutGen'],
     include_package_data=True,
 )
