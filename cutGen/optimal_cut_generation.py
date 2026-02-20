@@ -12,11 +12,44 @@ max_bkpts = 4
 
 def find_f_index(min_pwl):
     r"""
-    Assume a minimal function with a fininte nubmer of breakpoints. Finds the index i such that pi_p(lambda_i) = 1. 
+    Assume a model function, pi_p, with a fininte nubmer of breakpoints is given. 
+    Finds the index i such that pi_p(lambda_i) = 1.
+
+    INPUT:
+    - igp piecewise linear function
+    
+    OUTPUT:
+    - integer
     """
     return min_pwl.end_points().index(find_f(min_pwl))
+ 
 
+def sparse_enough_breakpoints(bkpt_old, epsilon):
+    r"""
+    Considers the space PWL(*<=n) and finds a point breakpoint seqeunce bkpt
+    such that  ||bkpt_old - bkpt||_infty < epsilon and that  bkpt[i+1]-bkpt[i] > epsilon xor bkpt[i] = bkpt[i+1].
+    This imples that d((bkpt_old,f), (bktp,f))<espilon and bkpt is "sparse enough". 
+     
+    INPUT:
+    - breakpoint sequence
+    
+    OUTPUT:
+    - breakpoint sequence such that bkpt[i+1]-bkpt[i] > epsilon xor bkpt[i] = bkpt[i+1].
+    """
+    bkpt = list(tuple(bkpt_old)) # cheap way of deep copying lists 
+    for i in range(len(bkpt)-1):
+        if abs(bkpt[i] - bkpt[i+1]) <= epsilon:
+            bkpt[i+1] = bkpt[i]
+    return bkpt
 
+def log_problem_result(bkpt, val, binvarow, binvc, f):
+    cut_gen_logger.info(f"Cut generation problem solved.")
+    cut_gen_logger.debug(f"breakpoitns: {bkpt}")
+    cut_gen_logger.debug(f"values: {val}")
+    cut_gen_logger.debug(f"row: {binvarow}")
+    cut_gen_logger.debug(f"objective:{binvc}")
+    cut_gen_logger.debug(f"f: {f}")
+   
 class UnsetData(Exception):
     pass
 
@@ -133,7 +166,6 @@ class cutScore:
         
         """
         # It is necessary for frac_f to be converted to exact rational from the MIP. 
-
         if self._MIP_objective is None:
             raise UnsetData("Set MIP_objective before use of CutScore.")
         if self._MIP_row is None:
@@ -252,7 +284,7 @@ class cutScore:
         f_trust = fractional(QQ(self._f_trust))
         cell = self._cell
         sage_point = [QQ(x) for x in point]
-        n = len(point)/2
+        n = int(len(point)/2)
         b, v  = [b for b in  sage_point[:n]], [v for v in sage_point[n:]]
         # model assumptions
         # pi(0) = 0, pi(f) = 1
@@ -260,17 +292,17 @@ class cutScore:
         if abs(b[0]-0) <= epsilon:
             b[0] = 0
         else:
-            cut_gen_logger.error(f"validate_point: breakpoint lambda_0 >0, point: {point}, cell: {cell}")
+            cut_gen_logger.debug(f"validate_point: breakpoint lambda_0 >0, point: {point}, cell: {cell}")
             raise FeasiblityError("breakpoint lambda_0 >0")
         if abs(b[f_index] - f_trust) <= epsilon:
             b[f_index] = f_trust
         else:
-            cut_gen_logger.error(f"validate_point: breakpoint lambda_{f_index} != {f_trust}: point: {point}, cell: {cell}")
+            cut_gen_logger.debug(f"validate_point: breakpoint lambda_{f_index} != {f_trust}: point: {point}, cell: {cell}")
             raise FeasiblityError(f"breakpoint lambda_{f_index} != {f_trust}")
         if abs(v[f_index] - 1) <= epsilon:
             v[f_index] = 1
         else:
-            cut_gen_logger.error(f"validate_point: breakpoint lambda_{f_index} !=1: point: {point}, cell: {cell}")
+            cut_gen_logger.debug(f"validate_point: breakpoint lambda_{f_index} !=1: point: {point}, cell: {cell}")
             raise FeasiblityError(f"value gamma_{f_index} != 1")
         # lipschitz constant and contunity. 
         for i in range(n-1):
@@ -278,7 +310,7 @@ class cutScore:
                 if abs(v[i+1]-v[i]) >= epsilon*M:
                     # potential discontunity
                     # not in (epsilon_i, M) - charts. 
-                    cut_gen_logger.error(f"validate_point: Solution does not have lipschitz constant {M}: point: {point}, cell: {cell}")
+                    cut_gen_logger.debug(f"validate_point: Solution does not have lipschitz constant {M}: point: {point}, cell: {cell}")
                     raise FeasiblityError(f"Solution does not have lipschitz constant {M}")
                 # lambda_i+1 = lambda_i
                 b[i+1] = b[i]
@@ -290,7 +322,7 @@ class cutScore:
                 # can assume the values are correct/as intended
         # the last breakpoint should be distinct from 1 to enforce a breakpoint sequence.
         if 1-b[n-1] <= epsilon:
-            cut_gen_logger.error(f"validate_point: breakpoint lambda_{n-1} >= 1: point: {point}, cell: {cell}")
+            cut_gen_logger.debug(f"validate_point: breakpoint lambda_{n-1} >= 1: point: {point}, cell: {cell}")
             raise FeasiblityError(f"breakpoint lambda_{n-1} >= 1")
         # b,v are rounded values.
         # ensure constraints hold
@@ -313,28 +345,24 @@ class cutScore:
                         # see if poly_val == 0 or not.
                         # assume poly(b+v) == 0. 
                         if abs(poly(sage_point)) <= sum(abs(grad(sage_point)) for grad in poly.gradient())*epsilon:
-                            cut_gen_logger.error(f"validate_point: {poly} evaluated at {b+v} == 0 when {poly} evaluated at {b+v} should be < 0: point: {point}, cell: {cell}")
+                            cut_gen_logger.debug(f"validate_point: {poly} evaluated at {b+v} == 0 when {poly} evaluated at {b+v} should be < 0: point: {point}, cell: {cell}")
                             raise FeasiblityError(f"{poly} evaluated at {b+v} == 0 when {poly} evaluated at {b+v} should be < 0")
                         else:
                             pass
                     else:
-                        cut_gen_logger.error(f"validate_point: {poly} evaluated at {b+v} >= 0 when {poly} evaluated at {b+v} should be < 0: point: {point}, cell: {cell}")
+                        cut_gen_logger.debug(f"validate_point: {poly} evaluated at {b+v} >= 0 when {poly} evaluated at {b+v} should be < 0: point: {point}, cell: {cell}")
                         raise FeasiblityError(f"{poly} evaluated at {b+v} >= 0 when {poly} evaluated at {b+v} should be < 0")
             for poly in cell.le_poly():
                 if poly(b+v) > 0:
-                    cut_gen_logger.error(f"validate_point: {poly} evaluated at {b+v} >0 when {poly} evaluated at {b+v} should be <=  0: point: {point}, cell: {cell}")
+                    cut_gen_logger.debug(f"validate_point: {poly} evaluated at {b+v} >0 when {poly} evaluated at {b+v} should be <=  0: point: {point}, cell: {cell}")
                     raise FeasiblityError(f"{poly} evaluated at {b+v} >0 when {poly} evaluated at {b+v} should be <= 0")      
                 
             for poly in cell.eq_poly():
                 if abs(poly(b+v)) >= epsilon or abs(poly(sage_point)) > sum(abs(grad(sage_point)) for grad in poly.gradient())*epsilon:
-                    cut_gen_logger.error(f"validate_point:{poly} evaluated at {b+v} != 0 when {poly} evaluated at {b+v} should be == 0: point: {point}, cell: {cell}")
+                    cut_gen_logger.debug(f"validate_point:{poly} evaluated at {b+v} != 0 when {poly} evaluated at {b+v} should be == 0: point: {point}, cell: {cell}")
                     raise FeasiblityError(f"{poly} evaluated at {b+v} != 0 when {poly} evaluated at {b+v} should be == 0")
         return b,v
-        # else:
-        #     # TODO: Try to do some error correcting, restart in this case. 
-        #     # We can try a restart counter, which assumes the breakpoints are "correct"
-        #     # but the values maybe have some issue.
-        #     raise FeasiblityError(f"pi_({b,v}) is not minimal.")
+
 
 class Parallelism(abstractCutScore):
     """
@@ -364,12 +392,14 @@ class cutGenerationProblem:
     
     The cutGenerationProblem options are listed below.
     
-    Option: row algorithm = full; bkpt_as_param
-    Option: num_bkpt = full: k <= max_bkpts
-    Option: cut_score = parallelism, steepestdirection, scip, or custom
-    Option: multithread = notImplemented
+    Option: row algorithm - full; bkpt_as_param
+    Option: num_bkpt - full: k <= max_bkpts
+    Option: cut_score - parallelism, steepestdirection, scip, or custom
+    Option: multithread - notImplemented
+    Option: prove_seperator - bool
+    Option: epsilon - value to det
     """
-    def __init__(self, algorithm_name=None, cut_score=None, num_bkpt=None, multithread=False, prove_seperator=False, epsilon=10**-7, M = 10**7):
+    def __init__(self, algorithm_name=None, cut_score=None, num_bkpt=None, multithread=False, prove_seperator=True, show_proof = False, epsilon=10**-7, M = 10**7):
         if algorithm_name is None or algorithm_name.lower() == "full":
             self._algorithm_name = "full"
             if num_bkpt is None or num_bkpt < 1 or num_bkpt > max_bkpt:
@@ -394,6 +424,9 @@ class cutGenerationProblem:
         self._cut_score.set_sage_to_solver_type(self._solver.sage_to_solver_type)
         self._cut_space = None
         self._prove_seperator = prove_seperator
+        self._show_proof = show_proof
+        self._espilon = epsilon
+        self._M = M
 
     def solve(self, binvarow, binvc, f):
         r"""Solves the paramaterized problem. 
@@ -419,8 +452,8 @@ class cutGenerationProblem:
         """
         self._cut_score.set_MIP_row(binvarow)
         self._cut_score.set_MIP_obj(binvc)
-        self._cut_score.set_espilon(10**-7)
-        self._cut_score.set_lipschitz_constant(10**6)
+        self._cut_score.set_espilon(self._espilon)
+        self._cut_score.set_lipschitz_constant(self._M)
         self._cut_score.set_f_trust(f)
         frac_f = fractional(QQ(f))
         def cut_score(params):
@@ -489,7 +522,7 @@ class cutGenerationProblem:
         cut_gen_logger.info(f"{pi_p} is the found function for the row: {binvarow}, objective:{binvc},and f{f}")
         if self._prove_seperator:
             res = minimality_test(pi_p) # add someway to log certificates. 
-            cut_gen_logger.info(f"minimality of  {pi_p}: {res}")
+            cut_gen_logger.error(f"minimality of  {pi_p}: {res}")
         return pi_p
 
     def _algorithm_bkpt_as_param(self, binvarow, binvc, f):
@@ -498,8 +531,8 @@ class cutGenerationProblem:
         """
         self._cut_score.set_MIP_row(binvarow)
         self._cut_score.set_MIP_obj(binvc)
-        self._cut_score.set_espilon(10**-7)
-        self._cut_score.set_lipschitz_constant(10**6)
+        self._cut_score.set_espilon(self._espilon)
+        self._cut_score.set_lipschitz_constant(self._M)
         self._cut_score.set_f_trust(f)
         frac_f = fractional(QQ(f))
         def cut_score(params):
@@ -514,20 +547,28 @@ class cutGenerationProblem:
             elif b_sym < 0:
                 symmetrized_bkpts += [sage_b, 1+b_sym]
         symmetrized_bkpts = unique_list(symmetrized_bkpts)
-        num_bkpt = len(symmetrized_bkpts)
+        symmetrized_bkpts.sort()
+        # it might be worht while to ensure if we have sufficent difference between breakpoints. 
+        sparse_bkpt = unique_list(sparse_enough_breakpoints(symmetrized_bkpts, self._espilon))
+        if frac_f not in sparse_bkpt:
+            sparse_bkpt.append(frac_f)
+        num_bkpt = len(sparse_bkpt)
         if num_bkpt == 2:
-            cut_gen_logger.warning(f"The row {binvarow} fails to have a non-trivail value polyhedron.")
+            cut_gen_logger.warning("Parsed row data suggests to use GMIC.")
+            cut_gen_logger.into("Dim of value polyhedron: 0")
             pi_p =  gmic(frac_f)
-            cut_gen_logger.info(f"{pi_p} is the found function for the row: {binvarow}, objective:{binvc},and f{f}")
+            log_problem_result(sparse_bkpt, [0, 1], , binvarow, binvc, f)
             if self._prove_seperator:
                 # we always have a seperator here.
-                cut_gen_logger.info(f"minimality of  {pi_p}: {True}")
+                cut_gen_logger.debug(f"The minimality of the found cgtf is {True}")
             # return gmic, the feasible set for the optimization problem is a singlton which corrosponds to gmic.
             return pi_p
-        symmetrized_bkpts.sort()
-        f_index = symmetrized_bkpts.index(frac_f)
+        # ensure a breakpoint sequence is given
+        sparse_bkpt.sort()
+        f_index = sparse_bkpt.index(frac_f)
         self._cut_score.set_f_index(f_index)
-        value_polyhedron =  value_nnc_polyhedron(symmetrized_bkpts, f_index)
+        value_polyhedron =  value_nnc_polyhedron(sparse_bkpt, f_index)
+        cut_gen_logger.info(f"Dim of value polyhedron :{value_polyhedron.upstairs().ambient_dim()}")
         point = list(value_polyhedron.find_point())
         # initalize a feasible point for the cut scoring funciton to remember.
         self._cut_score.set_feasible_point(point)
@@ -541,10 +582,10 @@ class cutGenerationProblem:
         val_result = [QQ(gamma_i) for gamma_i in point[num_bkpt:]]
         bkpt_result = [QQ(lambda_i) for lambda_i in point[:num_bkpt]]
         pi_p = piecewise_function_from_breakpoints_and_values(bkpt_result+[1], val_result+[0])
-        cut_gen_logger.info(f"{pi_p} is the found function for the row: {binvarow}, objective:{binvc},and f{f}")
         if self._prove_seperator:
-            res = minimality_test(pi_p) # add someway to log certificates. 
-            cut_gen_logger.info(f"minimality of  {pi_p}: {res}")
+            res = minimality_test(pi_p, self._show_proof) # add someway to log certificates. 
+            cut_gen_logger.info(f"Minimality of cgf: {res}")
+        log_problem_result(bkpt_result, val_result, binvarow, binvc, f)
         return pi_p
 
     def _algorithm_value_poly_lp(self, binvarow, binvc, f):
@@ -589,7 +630,7 @@ class cutGenerationProblem:
         pi_p = piecewise_function_from_breakpoints_and_values(bkpt + [1], vals+ [0])
         cut_gen_logger.info(f"{pi_p} is the found function for the row: {binvarow}, objective:{binvc},and f{f}")
         if self._prove_seperator:
-            res = minimality_test(pi_p) # add someway to log certificates. 
+            res = minimality_test(pi_p, True) # add someway to log certificates. 
             cut_gen_logger.info(f"minimality of  {pi_p}: {res}")
         return pi_p
         
@@ -779,11 +820,11 @@ class scipyCutGenProbelmSolverInterface(abstractCutGenProblemSolverInterface):
 
 
 class OptimalCut(Sepa):
-    def __init__(self, use_k_bkpts=None, algorithm_name=None, cut_scoring_method=None):
+    def __init__(self, algorithm_name=None, cut_score=None, num_bkpt=None, multithread=False, prove_seperator=True, show_proof = False, epsilon=10**-7, M = 10**7):
         self.ncuts = 0
-        self.cgp = cutGenerationProblem(algorithm_name=algorithm_name, cut_score=cut_scoring_method, num_bkpt=use_k_bkpts)
+        self.cgp = cutGenerationProblem(algorithm_name=algorithm_name, cut_score=cut_score, num_bkpt=num_bkpt, multithread=multithread, prove_seperator=prove_seperator, show_proof = show_proof, epsilon=epsilon, M = epsilon))
     def getOptimalCutFromRow(self, cols, rows, binvrow, binvarow, primsol, pi_p):
-        """ Given the row (binvarow, binvrow) of the tableau, computes optimized cut
+        """ Given the row (binvarow, binvrow) of the tableau, computes optimized cut.
 
         :param primsol:  is the rhs of the tableau row
         :param cols:     are the variables
