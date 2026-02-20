@@ -41,8 +41,15 @@ def sparse_enough_breakpoints(bkpt_old, epsilon):
         if abs(bkpt[i] - bkpt[i+1]) <= epsilon:
             bkpt[i+1] = bkpt[i]
     return bkpt
-            
 
+def log_problem_result(bkpt, val, binvarow, binvc, f):
+    cut_gen_logger.info(f"Cut generation problem solved.")
+    cut_gen_logger.debug(f"breakpoitns: {bkpt}")
+    cut_gen_logger.debug(f"values: {val}")
+    cut_gen_logger.debug(f"row: {binvarow}")
+    cut_gen_logger.debug(f"objective:{binvc}")
+    cut_gen_logger.debug(f"f: {f}")
+   
 class UnsetData(Exception):
     pass
 
@@ -392,7 +399,7 @@ class cutGenerationProblem:
     Option: prove_seperator - bool
     Option: epsilon - value to det
     """
-    def __init__(self, algorithm_name=None, cut_score=None, num_bkpt=None, multithread=False, prove_seperator=True, epsilon=10**-7, M = 10**7):
+    def __init__(self, algorithm_name=None, cut_score=None, num_bkpt=None, multithread=False, prove_seperator=True, show_proof = False, epsilon=10**-7, M = 10**7):
         if algorithm_name is None or algorithm_name.lower() == "full":
             self._algorithm_name = "full"
             if num_bkpt is None or num_bkpt < 1 or num_bkpt > max_bkpt:
@@ -417,6 +424,7 @@ class cutGenerationProblem:
         self._cut_score.set_sage_to_solver_type(self._solver.sage_to_solver_type)
         self._cut_space = None
         self._prove_seperator = prove_seperator
+        self._show_proof = show_proof
         self._espilon = epsilon
         self._M = M
 
@@ -546,12 +554,13 @@ class cutGenerationProblem:
             sparse_bkpt.append(frac_f)
         num_bkpt = len(sparse_bkpt)
         if num_bkpt == 2:
-            cut_gen_logger.warning(f"The row {binvarow} fails to generate a non-trivail value polyhedron.")
+            cut_gen_logger.warning("Parsed row data suggests to use GMIC.")
+            cut_gen_logger.into("Dim of value polyhedron: 0")
             pi_p =  gmic(frac_f)
-            cut_gen_logger.info(f"{pi_p} is the found function for the row: {binvarow}, objective:{binvc},and f{f}")
+            log_problem_result(sparse_bkpt, [0, 1], , binvarow, binvc, f)
             if self._prove_seperator:
                 # we always have a seperator here.
-                cut_gen_logger.info(f"minimality of  {pi_p}: {True}")
+                cut_gen_logger.debug(f"The minimality of the found cgtf is {True}")
             # return gmic, the feasible set for the optimization problem is a singlton which corrosponds to gmic.
             return pi_p
         # ensure a breakpoint sequence is given
@@ -559,7 +568,7 @@ class cutGenerationProblem:
         f_index = sparse_bkpt.index(frac_f)
         self._cut_score.set_f_index(f_index)
         value_polyhedron =  value_nnc_polyhedron(sparse_bkpt, f_index)
-        cut_gen_logger.info(f"Dim of value polyhedron {value_polyhedron.upstairs().ambient_dim()}")
+        cut_gen_logger.info(f"Dim of value polyhedron :{value_polyhedron.upstairs().ambient_dim()}")
         point = list(value_polyhedron.find_point())
         # initalize a feasible point for the cut scoring funciton to remember.
         self._cut_score.set_feasible_point(point)
@@ -573,10 +582,10 @@ class cutGenerationProblem:
         val_result = [QQ(gamma_i) for gamma_i in point[num_bkpt:]]
         bkpt_result = [QQ(lambda_i) for lambda_i in point[:num_bkpt]]
         pi_p = piecewise_function_from_breakpoints_and_values(bkpt_result+[1], val_result+[0])
-        cut_gen_logger.info(f"{pi_p} is the found function for the row: {binvarow}, objective:{binvc},and f{f}")
         if self._prove_seperator:
-            res = minimality_test(pi_p) # add someway to log certificates. 
-            cut_gen_logger.error(f"minimality of  {pi_p}: {res}")
+            res = minimality_test(pi_p, self._show_proof) # add someway to log certificates. 
+            cut_gen_logger.info(f"Minimality of cgf: {res}")
+        log_problem_result(bkpt_result, val_result, binvarow, binvc, f)
         return pi_p
 
     def _algorithm_value_poly_lp(self, binvarow, binvc, f):
@@ -621,7 +630,7 @@ class cutGenerationProblem:
         pi_p = piecewise_function_from_breakpoints_and_values(bkpt + [1], vals+ [0])
         cut_gen_logger.info(f"{pi_p} is the found function for the row: {binvarow}, objective:{binvc},and f{f}")
         if self._prove_seperator:
-            res = minimality_test(pi_p) # add someway to log certificates. 
+            res = minimality_test(pi_p, True) # add someway to log certificates. 
             cut_gen_logger.info(f"minimality of  {pi_p}: {res}")
         return pi_p
         
@@ -811,11 +820,11 @@ class scipyCutGenProbelmSolverInterface(abstractCutGenProblemSolverInterface):
 
 
 class OptimalCut(Sepa):
-    def __init__(self, use_k_bkpts=None, algorithm_name=None, cut_scoring_method=None):
+    def __init__(self, algorithm_name=None, cut_score=None, num_bkpt=None, multithread=False, prove_seperator=True, show_proof = False, epsilon=10**-7, M = 10**7):
         self.ncuts = 0
-        self.cgp = cutGenerationProblem(algorithm_name=algorithm_name, cut_score=cut_scoring_method, num_bkpt=use_k_bkpts)
+        self.cgp = cutGenerationProblem(algorithm_name=algorithm_name, cut_score=cut_score, num_bkpt=num_bkpt, multithread=multithread, prove_seperator=prove_seperator, show_proof = show_proof, epsilon=epsilon, M = epsilon))
     def getOptimalCutFromRow(self, cols, rows, binvrow, binvarow, primsol, pi_p):
-        """ Given the row (binvarow, binvrow) of the tableau, computes optimized cut
+        """ Given the row (binvarow, binvrow) of the tableau, computes optimized cut.
 
         :param primsol:  is the rhs of the tableau row
         :param cols:     are the variables
