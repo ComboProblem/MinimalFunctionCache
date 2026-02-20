@@ -36,9 +36,14 @@ def sparse_enough_breakpoints(bkpt_old, epsilon):
     OUTPUT:
     - breakpoint sequence such that bkpt[i+1]-bkpt[i] > epsilon xor bkpt[i] = bkpt[i+1].
     """
-    bkpt = list(tuple(bkpt_old)) # cheap way of deep copying lists 
+    bkpt = list(tuple(bkpt_old)) # cheap way of deep copying lists
     for i in range(len(bkpt)-1):
-        if abs(bkpt[i] - bkpt[i+1]) <= epsilon:
+        if abs(bkpt[i]) < epsilon:
+            bkpt[i] = 0
+        # 1 equiv 0 mod 1
+        elif abs(bkpt[i] - 1) < epsilon:
+            bkpt[i] = 0
+        elif abs(bkpt[i] - bkpt[i+1]) < epsilon:
             bkpt[i+1] = bkpt[i]
     return bkpt
 
@@ -65,7 +70,7 @@ class FeasiblityError(Exception):
 class abstractCutScore:
     r"""
     Abstract class for cut optimization objective functions aka cut scores.
-    Named after huersticis used to evalaute a cuts effectiveness.
+    Named after huersticis used to evaluate a cuts effectiveness.
     """
     @classmethod
     def __init__(cls, **kwrds):
@@ -78,7 +83,7 @@ class abstractCutScore:
         Suppose that R is a ring such that either QQ subseteq R subseteq RR or  R is a ring that can 
         coercied to a ring R' wiht QQ subseteq R' subseteq RR.
 
-        cut_score should use sagemath types to ensure generating a seperating cut.
+        cut_score should use sagemath types to ensure generating a separating cut.
         
         input: cut, mip_obj 
         cut: A list of length n-m of elements of R representing a proposed cut to a given MIP.
@@ -178,7 +183,7 @@ class cutScore:
         # of minimality. 
         # validate_point will either give a point p = b,v which
         # we believe to up to rounding and L.C. that pi_p is a minimal function in the current cell
-        # and satasfies the conditons of the model.
+        # and satisfies the conditions of the model.
         # or will raise an error
         b, v = self.validate_point(parameters)
         self.set_feasible_point(b+v)
@@ -402,8 +407,8 @@ class cutGenerationProblem:
     def __init__(self, algorithm_name=None, cut_score=None, num_bkpt=None, multithread=False, prove_seperator=True, show_proof = False, epsilon=10**-7, M = 10**7):
         if algorithm_name is None or algorithm_name.lower() == "full":
             self._algorithm_name = "full"
-            if num_bkpt is None or num_bkpt < 1 or num_bkpt > max_bkpt:
-                raise ValueError(f"Incorrect number of breakpoints defined for full algorithm. 2 <= num_bkpt <= {max_bkpt}.")
+            if num_bkpt is None or num_bkpt < 1 or num_bkpt > max_bkpts:
+                raise ValueError(f"Incorrect number of breakpoints defined for full algorithm. 2 <= num_bkpt <= {max_bkpts}.")
             self._num_bkpt = num_bkpt
             self._cut_space = None
             self._solver = scipyCutGenProbelmSolverInterface
@@ -436,7 +441,7 @@ class cutGenerationProblem:
         Passes any instructions to the underlying solver.
         
         """
-        # assume MIP is a scip model; really we should be passing in and LP relaxation with variable infomation here.
+        # assume MIP is a scip model; really we should be passing in and LP relaxation with variable information here.
         # The cut generation problem 
         if self._algorithm_name == "full":
             cgf = self._algorithm_full_space(binvarow, binvc, f)
@@ -512,10 +517,10 @@ class cutGenerationProblem:
                         rep_elem_of_best_cell = b+v
             except EmptyBSA:
                 pass
-        # If result is None, the solver has failed to find any meaninful result. 
+        # If result is None, the solver has failed to find any meaningful result. 
         # There should always be a result and the SolverError should never be raised.
         if best_result is None:
-            raise SolverError("The solver has failed, we should always get a result from the computaiton.")
+            raise SolverError("The solver has failed, we should always get a result from the computation.")
         val_result = [QQ(gamma_i) for gamma_i in solution_for_best_result[self._num_bkpt:]]
         bkpt_result = [QQ(lambda_i) for lambda_i in solution_for_best_result[:self._num_bkpt]]
         pi_p = piecewise_function_from_breakpoints_and_values(bkpt_result+[1],val_result+[0])
@@ -548,7 +553,7 @@ class cutGenerationProblem:
                 symmetrized_bkpts += [sage_b, 1+b_sym]
         symmetrized_bkpts = unique_list(symmetrized_bkpts)
         symmetrized_bkpts.sort()
-        # it might be worht while to ensure if we have sufficent difference between breakpoints. 
+        # it might be worth while to ensure if we have sufficient difference between breakpoints. 
         sparse_bkpt = unique_list(sparse_enough_breakpoints(symmetrized_bkpts, self._espilon))
         if frac_f not in sparse_bkpt:
             sparse_bkpt.append(frac_f)
@@ -557,11 +562,11 @@ class cutGenerationProblem:
             cut_gen_logger.warning("Parsed row data suggests to use GMIC.")
             cut_gen_logger.into("Dim of value polyhedron: 0")
             pi_p =  gmic(frac_f)
-            log_problem_result(sparse_bkpt, [0, 1], , binvarow, binvc, f)
+            log_problem_result(sparse_bkpt, [0, 1], binvarow, binvc, f)
             if self._prove_seperator:
                 # we always have a seperator here.
-                cut_gen_logger.debug(f"The minimality of the found cgtf is {True}")
-            # return gmic, the feasible set for the optimization problem is a singlton which corrosponds to gmic.
+                cut_gen_logger.debug(f"The minimality of the found cgf is {True}")
+            # return gmic, the feasible set for the optimization problem is a single point which corresponds to gmic.
             return pi_p
         # ensure a breakpoint sequence is given
         sparse_bkpt.sort()
@@ -570,7 +575,7 @@ class cutGenerationProblem:
         value_polyhedron =  value_nnc_polyhedron(sparse_bkpt, f_index)
         cut_gen_logger.info(f"Dim of value polyhedron :{value_polyhedron.upstairs().ambient_dim()}")
         point = list(value_polyhedron.find_point())
-        # initalize a feasible point for the cut scoring funciton to remember.
+        # initialize a feasible point for the cut scoring function to remember.
         self._cut_score.set_feasible_point(point)
         self._cut_score.set_current_cell(value_polyhedron)
         value_polyhedron_constraints = self._solver.write_linear_constraints_from_bsa(value_polyhedron)
@@ -604,7 +609,7 @@ class cutGenerationProblem:
         num_bkpt = len(symmetrized_bkpts)
         if num_bkpt == 2:
             # put a logging step here.
-            # return gmic, the feasible set for the optimization problem is a singlton which corrosponds to gmic.
+            # return gmic, the feasible set for the optimization problem is a singlton which corresponds to gmic.
             return gmic(frac_f)
         symmetrized_bkpts.sort()
         f_index = symmetrized_bkpts.index(frac_f)
@@ -822,7 +827,7 @@ class scipyCutGenProbelmSolverInterface(abstractCutGenProblemSolverInterface):
 class OptimalCut(Sepa):
     def __init__(self, algorithm_name=None, cut_score=None, num_bkpt=None, multithread=False, prove_seperator=True, show_proof = False, epsilon=10**-7, M = 10**7):
         self.ncuts = 0
-        self.cgp = cutGenerationProblem(algorithm_name=algorithm_name, cut_score=cut_score, num_bkpt=num_bkpt, multithread=multithread, prove_seperator=prove_seperator, show_proof = show_proof, epsilon=epsilon, M = epsilon))
+        self.cgp = cutGenerationProblem(algorithm_name=algorithm_name, cut_score=cut_score, num_bkpt=num_bkpt, multithread=multithread, prove_seperator=prove_seperator, show_proof = show_proof, epsilon=epsilon, M = epsilon)
     def getOptimalCutFromRow(self, cols, rows, binvrow, binvarow, primsol, pi_p):
         """ Given the row (binvarow, binvrow) of the tableau, computes optimized cut.
 
