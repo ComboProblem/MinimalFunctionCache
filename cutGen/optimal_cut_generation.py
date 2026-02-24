@@ -4,6 +4,7 @@ from pyscipopt import Model, Sepa, SCIP_RESULT
 import logging
 
 cut_gen_logger = logging.getLogger(__name__)
+cut_gen_logger.setLevel(logging.WARNING)
 
 minimal_function_cashe_logging = True
 
@@ -45,15 +46,19 @@ def sparse_enough_breakpoints(bkpt_old, epsilon):
             bkpt[i] = 0
         elif abs(bkpt[i] - bkpt[i+1]) < epsilon:
             bkpt[i+1] = bkpt[i]
+    if abs(bkpt[len(bkpt)-1] -1) < epsilon or abs(bkpt[len(bkpt)-1])< epsilon:
+        bkpt[len(bkpt)-1] = 0
     return bkpt
+
 
 def log_problem_result(bkpt, val, binvarow, binvc, f):
     cut_gen_logger.info(f"Cut generation problem solved.")
-    cut_gen_logger.debug(f"breakpoitns: {bkpt}")
-    cut_gen_logger.debug(f"values: {val}")
-    cut_gen_logger.debug(f"row: {binvarow}")
-    cut_gen_logger.debug(f"objective:{binvc}")
-    cut_gen_logger.debug(f"f: {f}")
+    cut_gen_logger.info(f"breakpoitns: {bkpt}")
+    cut_gen_logger.info(f"values: {val}")
+    cut_gen_logger.info(f"row: {binvarow}")
+    cut_gen_logger.info(f"objective:{binvc}")
+    cut_gen_logger.info(f"f: {f}")
+
    
 class UnsetData(Exception):
     pass
@@ -292,18 +297,32 @@ class cutScore:
         n = int(len(point)/2)
         b, v  = [b for b in  sage_point[:n]], [v for v in sage_point[n:]]
         # model assumptions
-        # pi(0) = 0, pi(f) = 1
         # we log all errors
+        # breakpoints should be in [0,1)
+        # values should be in [0,1]
+        for i in range(n):
+            if b[i] < 0 or b[i] + epsilon >= 1:
+                raise FeasiblityError(f"breakpoint lambda_{i} < 0 or lambda_{i}>= 1; lambda_{i}=={b[i]}")
+            if v[i] < 0 or v[i] + epsilon > 1:
+                raise FeasiblityError(f"breakpoint gamma_{i} < 0 or gamma_{i}>= 1; gamma_{i}=={v[i]}")
+        # pi(0) = 0, pi(f) = 1
         if abs(b[0]-0) <= epsilon:
             b[0] = 0
         else:
             cut_gen_logger.debug(f"validate_point: breakpoint lambda_0 >0, point: {point}, cell: {cell}")
             raise FeasiblityError("breakpoint lambda_0 >0")
+        if abs(v[0]-0) <= epsilon:
+            v[0] = 0
+        else:
+            cut_gen_logger.debug(f"validate_point: breakpoint gamma_0 >0, point: {point}, cell: {cell}")
+            raise FeasiblityError("value gamma_0 >0")
+        # bkpt[f_index] == f
         if abs(b[f_index] - f_trust) <= epsilon:
             b[f_index] = f_trust
         else:
             cut_gen_logger.debug(f"validate_point: breakpoint lambda_{f_index} != {f_trust}: point: {point}, cell: {cell}")
             raise FeasiblityError(f"breakpoint lambda_{f_index} != {f_trust}")
+        # pi_p(f) = 1
         if abs(v[f_index] - 1) <= epsilon:
             v[f_index] = 1
         else:
@@ -311,7 +330,7 @@ class cutScore:
             raise FeasiblityError(f"value gamma_{f_index} != 1")
         # lipschitz constant and contunity. 
         for i in range(n-1):
-            if 0 < b[i+1]-b[i] <= epsilon:
+            if 0 < b[i+1]-b[i]<= epsilon:
                 if abs(v[i+1]-v[i]) >= epsilon*M:
                     # potential discontunity
                     # not in (epsilon_i, M) - charts. 
@@ -320,8 +339,9 @@ class cutScore:
                 # lambda_i+1 = lambda_i
                 b[i+1] = b[i]
                 # contunity, gamma_i =gamma_i+1
-                if abs(v[i+1]-v[i]) < epsilon:
-                    v[i+1] = v[i]
+                if abs(v[i+1]-v[i]) > epsilon:
+                    raise FeasiblityError
+                v[i+1] = v[i]
                 # when epsilon <= v[i+1]-v[i] < epsilon*M
                 # the solution exists in the intersection of the epsilon,M
                 # can assume the values are correct/as intended
@@ -335,7 +355,6 @@ class cutScore:
         # implies  poly(point) = poly((b,v) + O(epsilon)) = poly(b,v) + total_deriv(poly)( point)+O(epspsilon)) + O(epsilon^2)
         # We treat episolon^2 -> 0. Hence poly(point) = total_deriv(poly)(O(epsilon)) <= total_deriv(poly)(epsilon)
         # the above does not hold, then poly(b,v) != 0.   
-
         # note the polynomial parents should have variable names lambda_0,...,lambda_n-1, gamma_0,...,gamma_n-1 in order.
         # hence we can lazily evaluate polys from the cell.
         # this does not seem to make a difference so it should be safe to ignore. 
@@ -559,8 +578,8 @@ class cutGenerationProblem:
             sparse_bkpt.append(frac_f)
         num_bkpt = len(sparse_bkpt)
         if num_bkpt == 2:
-            cut_gen_logger.warning("Parsed row data suggests to use GMIC.")
-            cut_gen_logger.into("Dim of value polyhedron: 0")
+            cut_gen_logger.info("Parsed row data suggests to use GMIC.")
+            cut_gen_logger.info("Dim of value polyhedron: 0")
             pi_p =  gmic(frac_f)
             log_problem_result(sparse_bkpt, [0, 1], binvarow, binvc, f)
             if self._prove_seperator:
@@ -708,22 +727,23 @@ class scipyCutGenProbelmSolverInterface(abstractCutGenProblemSolverInterface):
         # 
         lb = []
         ub = []
-        A = []
+        eq = []
+        A_ieq = []
+        A_eq = []
         for polynomial in bsa.eq_poly():
             if polynomial.degree() != 1:
                 raise ValueError(f"Constraint {polynomial} == 0 is not linear.")
             linear_coeffs = [polynomial.coefficient(i) for i in polynomial.parent().gens()]
-            A.append(linear_coeffs)
+            A_eq.append(linear_coeffs)
             # polys in bsa are written poly op 0
             # rewrite to correct scipy notation.
             constant = -1*polynomial.constant_coefficient() 
-            lb.append(constant)
-            ub.append(constant)
+            eq.append(constant)
         for polynomial in bsa.lt_poly():
             if polynomial.degree() != 1:
                 raise ValueError(f"Constraint {polynomial} < 0 is not linear.")
             linear_coeffs = [polynomial.coefficient(i) for i in polynomial.parent().gens()]
-            A.append(linear_coeffs)
+            A_ieq.append(linear_coeffs)
             # mimic in a non-rigrous way <
             constant = -1*polynomial.constant_coefficient() - epsilon
             lb.append(-np.inf)
@@ -732,15 +752,20 @@ class scipyCutGenProbelmSolverInterface(abstractCutGenProblemSolverInterface):
             if polynomial.degree() != 1:
                 raise ValueError(f"Constraint {polynomial} < 0 is not linear.")
             linear_coeffs = [polynomial.coefficient(i) for i in polynomial.parent().gens()]
-            A.append(linear_coeffs)
+            A_ieq.append(linear_coeffs)
             constant = -1*polynomial.constant_coefficient()
             lb.append(-np.inf)
             ub.append(constant)
         lb = np.array(lb)
         ub = np.array(ub)
-        A = np.array(A)
-        return LinearConstraint(A, lb, ub)
-
+        if len(lb) == 0 and len(eq) > 0 :
+            LinearConstraint(np.array(A_eq), eq, eq)
+        elif len(lb) >0  and len(eq) > 0:
+            return [LinearConstraint(np.array(A_eq), eq, eq), LinearConstraint(np.array(A_ieq), lb, ub)]
+        elif len(lb) >0  and len(eq) == 0:
+            return LinearConstraint(np.array(A_ieq), lb, ub)
+        else:
+            raise ValueError(f"No constraints have been written.")
     @staticmethod       
     def write_nonlinear_constraints_from_bsa(bsa, epsilon=10**-9):
         r"""
@@ -883,15 +908,14 @@ class OptimalCut(Sepa):
                 # the coefficient (see below)
                 cutelem = float(pi_p(fractional(QQ(rowelem)))) #keep types correct
             else:
-                # how does one generate cont
                 # Continuous variables
-                # if rowelem < 0.0:
-                    # -sum(a_j*f_0/(1-f_0) x_j      , j in J_C s.t. a_j  <   0) >= f_0.
-                    # cutelem = rowelem * ratiof0compl
-                # else:
-                    #  sum(a_j x_j,                 , j in J_C s.t. a_j >=   0) -
-                    # cutelem = -rowelem
-                pass # IPs don't have cont. variables, which is what I'm writing for right  now. 
+                # From matthias, do the supperattitive portion of the function about 0.
+                def psi(x):
+                    if x < 0:
+                        return pi_p.functions()[-1](x)
+                    else:
+                        return pi_p.functions()[0](x)
+                cutelem = float(psi(fractional(QQ)(rowelem)))
             # cut is define when variables are in [0, infty). Translate to general bounds
             if not scip.isZero(cutelem):
                 if col.getBasisStatus() == "upper":
@@ -933,13 +957,12 @@ class OptimalCut(Sepa):
                 cutelem = float(pi_p(fractional(QQ(rowelem))))
             else:
                 # Continuous variables
-                # if rowelem < 0.0:
-                    # -sum(a_j*f_0/(1-f_0) x_j      , j in J_C s.t. a_j  <   0) >= f_0.
-                #     cutelem = rowelem * ratiof0compl
-                # else:
-                    #  sum(a_j x_j,                 , j in J_C s.t. a_j >=   0) -
-                    # cutelem = -rowelem
-                pass
+                def psi(x):
+                    if x < 0:
+                        return pi_p.functions()[-1](x)
+                    else:
+                        return pi_p.functions()[0](x)
+                cutelem = float(psi(fractional(QQ)(rowelem)))
 
             # cut is define in original variables, so we replace slack by its definition
             if not scip.isZero(cutelem):
