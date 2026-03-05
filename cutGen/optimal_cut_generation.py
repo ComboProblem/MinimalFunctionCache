@@ -2,7 +2,7 @@ from cutgeneratingfunctionology.igp import *
 from scipy.optimize import minimize, LinearConstraint, NonlinearConstraint
 from pyscipopt import Model, Sepa, SCIP_RESULT
 import logging
-from time import time
+import time
 
 cut_gen_logger = logging.getLogger(__name__)
 cut_gen_logger.setLevel(logging.WARNING)
@@ -72,6 +72,23 @@ class SolverError(Exception):
 class FeasiblityError(Exception):
     pass
 
+
+class SolverTimeOut(Exception):
+    pass
+
+
+class cgfTimer:
+    def __init__(self, max_time):
+        if max_time < 0:
+            max_time = -1
+        self._max_time = max_time
+        self._start_time  =  time.process_time()
+
+    def solver_time_out(self):
+        if time.process_time() - self._start_time >= self._max_time:
+            cut_gen_logger.warning(f"Solver timed out.")
+            return True
+        return False
 
 class abstractCutScore:
     r"""
@@ -161,6 +178,8 @@ class cutScore:
         self._MIP_objective = None
         self._MIP_row = None
         self._sage_to_solver_type = None
+        self._timer = None
+        self._feasible_point = None
         if "obj_type" in kwrds.keys():
             self._cut_obj_type = kwrds.keys()["obj_type"]
         else:
@@ -198,6 +217,9 @@ class cutScore:
         sage_cut = [pi(fractional(QQ(bar_a_ij))) for bar_a_ij in row_data]
         sage_mip_obj =  [QQ(bar_cj) for bar_cj in self._MIP_objective]
         result = self.get_sage_to_solver_type()(self._cut_score.cut_score(sage_cut, sage_mip_obj))
+        if self._timer is not None:
+            if self._timer.solver_time_out():
+                raise SolverTimeOut
         return result
         
     @staticmethod
@@ -281,6 +303,12 @@ class cutScore:
     def set_sage_to_solver_type(self, new_conversion):
         self._sage_to_solver_type = new_conversion
 
+    def set_timer(self, timer):
+        """
+        Timer is a class which keeps track of the solvers time spent solving the cgf problem.
+        """
+        self._timer = timer
+
     def cut_obj_type(self):
          self._cut_obj_type
 
@@ -302,9 +330,9 @@ class cutScore:
         # breakpoints should be in [0,1)
         # values should be in [0,1]
         for i in range(n):
-            if b[i] < 0 or b[i] + epsilon >= 1:
+            if (b[i] < 0 or b[i] + epsilon >= 1) and i != f_index:
                 raise FeasiblityError(f"breakpoint lambda_{i} < 0 or lambda_{i}>= 1; lambda_{i}=={b[i]}")
-            if v[i] < 0 or v[i] + epsilon > 1:
+            if (v[i] < 0 or v[i] + epsilon > 1) and i != f_index:
                 raise FeasiblityError(f"breakpoint gamma_{i} < 0 or gamma_{i}>= 1; gamma_{i}=={v[i]}")
         # pi(0) = 0, pi(f) = 1
         if abs(b[0]-0) <= epsilon:
@@ -426,9 +454,8 @@ class cutGenerationProblem:
     Option: epsilon - value to det
     """
     def __init__(self, algorithm_name=None, cut_score=None, num_bkpt=None, multithread=False, prove_seperator=True, show_proof=False,
-        epsilon=10**-7, M = 10**7, max_cgf_solver_iter=None, max_cgf_solver_time=None, paramaterized_problem_solver=None, 
-        minimal_function_cache_path = None):
-
+        epsilon=10**-7, M = 10**7, max_cgf_solver_iter=None, max_cgf_solver_time=-1, paramaterized_problem_solver=None, 
+        minimal_function_cache_path = None, backend=None):
         if algorithm_name is None or algorithm_name.lower() == "full":
             self._algorithm_name = "full"
             if num_bkpt is None or num_bkpt < 1 or num_bkpt > max_bkpts:
@@ -454,7 +481,7 @@ class cutGenerationProblem:
         self._cut_space = None
         self._prove_seperator = prove_seperator
         self._show_proof = show_proof
-
+        self._backend = backend
         self._espilon = epsilon
         self._M = M
         self._max_cgf_solver_iter = max_cgf_solver_iter
@@ -499,7 +526,10 @@ class cutGenerationProblem:
         if self._cut_space is None: # load the semi algebraic descriptions. 
              if self._num_bkpt > max_bkpts:
                 raise ValueError("The Minimal Functions Cache for {} breakpoints requested has not been computed.".format(self._num_bkpt))
-             self._cut_space = PiMinContContainer(self._num_bkpt)
+             self._cut_space = PiMinContContainer(self._num_bkpt, backend=self._backend)
+        # start the clock when the actual portion of the solving processs starts.
+        problem_timer = cgfTimer(self._max_cgf_solver_time)
+        self._cut_score.set_timer(problem_timer)
         for b, v in self._cut_space.get_rep_elems():
             # f is a bkpt when pi has a finite number of bkpts.
             # start by finding a bkpt sequence in the same cell 
@@ -508,7 +538,7 @@ class cutGenerationProblem:
             pi_test = piecewise_function_from_breakpoints_and_values(b+[1], v+[0])
             bsa_f_index = find_f_index(pi_test)
             self._cut_score.set_f_index(bsa_f_index)
-            bkpt_bsa = nnc_poly_from_bkpt_sequence(b)
+            bkpt_bsa = nnc_poly_from_bkpt_sequence(b, backend=self._backend)
             lambda_f_index = bkpt_bsa.polynomial_map()[0].parent().gens()[bsa_f_index]
             bkpt_bsa.add_polynomial_constraint(lambda_f_index - frac_f, operator.eq)
             try:
@@ -529,12 +559,34 @@ class cutGenerationProblem:
                         self._solver.nonlinear_solve(cut_score, point, subdomain_solver_constraints)
                     except FeasiblityError:
                         pass
+                    except SolverTimeOut:
+                        # use the last good point to see if we have improvement before timing out our compuation
+                        # and sending the result to the MIP
+                        self._cut_score.set_timer(None)
+                        point = self._cut_score.get_feasible_point()
+                        if point is not None:                    
+                            value_for_cell = self._cut_score(point)
+                            if solution_for_best_result is None:
+                                best_result = value_for_cell
+                                solution_for_best_result = point
+                                rep_elem_of_best_cell = b+v
+                            if best_value < value_for_cell:
+                                best_value = value_for_cell
+                                solution_for_best_result = point
+                                rep_elem_of_best_cell = b+v                        
+                        break
                     # When a FeasiblityError is encountered 
                     # the NL solver has violated a constraint of the model or minimality
                     # within the cell. Use the last known feasible point from the 
                     # solver.
-                    point = self._cut_score.get_feasible_point() 
-                    value_for_cell = self._cut_score(point)
+                    point = self._cut_score.get_feasible_point()
+                    try:
+                        value_for_cell = self._cut_score(point)
+                        continue_solving =  True
+                    except SolverTimeOut:
+                        self._cut_score.set_timer(None)
+                        value_for_cell = self._cut_score(point)       
+                        continue_solving =  False                        
                     if solution_for_best_result is None:
                         best_result = value_for_cell
                         solution_for_best_result = point
@@ -543,19 +595,23 @@ class cutGenerationProblem:
                         best_value = value_for_cell
                         solution_for_best_result = point
                         rep_elem_of_best_cell = b+v
+                    if not continue_solving:
+                        break 
+                         
             except EmptyBSA:
                 pass
-        # If result is None, the solver has failed to find any meaningful result. 
-        # There should always be a result and the SolverError should never be raised.
+        # If result is None, the solver has failed to find any meaningful result or the computation has timed out.
+        # There should always be a result and the SolverError should never be raised unless the computaion has timed out.
         if best_result is None:
-            raise SolverError("The solver has failed, we should always get a result from the computation.")
+            raise SolverError("The solver has failed, we should always get a result from the computation. Try increasing the time allowed for the solver to run.")
         val_result = [QQ(gamma_i) for gamma_i in solution_for_best_result[self._num_bkpt:]]
         bkpt_result = [QQ(lambda_i) for lambda_i in solution_for_best_result[:self._num_bkpt]]
         pi_p = piecewise_function_from_breakpoints_and_values(bkpt_result+[1],val_result+[0])
         cut_gen_logger.info(f"{pi_p} is the found function for the row: {binvarow}, objective:{binvc},and f{f}")
         if self._prove_seperator:
             res = minimality_test(pi_p) # add someway to log certificates. 
-            cut_gen_logger.error(f"minimality of  {pi_p}: {res}")
+            if not res:
+                cut_gen_logger.error(f"minimality of  {pi_p}: {res}")
         return pi_p
 
     def _algorithm_bkpt_as_param(self, binvarow, binvc, f):
@@ -567,6 +623,8 @@ class cutGenerationProblem:
         self._cut_score.set_espilon(self._espilon)
         self._cut_score.set_lipschitz_constant(self._M)
         self._cut_score.set_f_trust(f)
+        problem_timer = cgfTimer(self._max_cgf_solver_time)
+        self._cut_score.set_timer(problem_timer)
         frac_f = fractional(QQ(f))
         def cut_score(params):
             return self._cut_score(params)
@@ -597,11 +655,10 @@ class cutGenerationProblem:
             # return gmic, the feasible set for the optimization problem is a single point which corresponds to gmic.
             return pi_p
         # ensure a breakpoint sequence is given
-        if len(sparse_bkpt) > self._
         sparse_bkpt.sort()
         f_index = sparse_bkpt.index(frac_f)
         self._cut_score.set_f_index(f_index)
-        value_polyhedron =  value_nnc_polyhedron(sparse_bkpt, f_index)
+        value_polyhedron =  value_nnc_polyhedron(sparse_bkpt, f_index, backend=self._backend)
         cut_gen_logger.info(f"Dim of value polyhedron :{value_polyhedron.upstairs().ambient_dim()}")
         point = list(value_polyhedron.find_point())
         # initialize a feasible point for the cut scoring function to remember.
@@ -612,6 +669,11 @@ class cutGenerationProblem:
             result = self._solver.nonlinear_solve(cut_score, point, value_polyhedron_constraints)
         except FeasiblityError:
             pass
+        except SolverTimeOut:
+            self._cut_score.set_timer(None)
+            if self._cut_score.get_feasible_point() is None:
+                raise SolverError("The solver has failed to find a feasible point, allocate more solver time")
+        self._cut_score.set_timer(None)
         result_point = self._cut_score.get_feasible_point()  # this should always be defined.
         val_result = [QQ(gamma_i) for gamma_i in point[num_bkpt:]]
         bkpt_result = [QQ(lambda_i) for lambda_i in point[:num_bkpt]]
