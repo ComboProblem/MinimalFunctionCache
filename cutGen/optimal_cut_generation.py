@@ -2,6 +2,7 @@ from cutgeneratingfunctionology.igp import *
 from scipy.optimize import minimize, LinearConstraint, NonlinearConstraint
 from pyscipopt import Model, Sepa, SCIP_RESULT
 import logging
+from time import time
 
 cut_gen_logger = logging.getLogger(__name__)
 cut_gen_logger.setLevel(logging.WARNING)
@@ -407,6 +408,7 @@ class SteepestDirection(abstractCutScore):
         dot_product = vector(mip_obj).row()*vector(cut).column()
         return dot_product[0][0]
 
+# cutGenProblemParametersNames = ["algorithm", "cut_score", "max_num_bkpt", "multithread", "prove_seperator", "epsilon", "M", "max_cgf_solver_time", "max_cgf_solver_iter"]
 
 class cutGenerationProblem:
     r""" 
@@ -423,7 +425,10 @@ class cutGenerationProblem:
     Option: prove_seperator - bool
     Option: epsilon - value to det
     """
-    def __init__(self, algorithm_name=None, cut_score=None, num_bkpt=None, multithread=False, prove_seperator=True, show_proof = False, epsilon=10**-7, M = 10**7):
+    def __init__(self, algorithm_name=None, cut_score=None, num_bkpt=None, multithread=False, prove_seperator=True, show_proof=False,
+        epsilon=10**-7, M = 10**7, max_cgf_solver_iter=None, max_cgf_solver_time=None, paramaterized_problem_solver=None, 
+        minimal_function_cache_path = None):
+
         if algorithm_name is None or algorithm_name.lower() == "full":
             self._algorithm_name = "full"
             if num_bkpt is None or num_bkpt < 1 or num_bkpt > max_bkpts:
@@ -444,13 +449,17 @@ class cutGenerationProblem:
             try:
                 self._cut_score = cutScore(cut_score)
             except NameError:
-                raise ValueError("Ya cut score is whack.")
+                raise ValueError("Please provided a valid defined cutscore.")
         self._cut_score.set_sage_to_solver_type(self._solver.sage_to_solver_type)
         self._cut_space = None
         self._prove_seperator = prove_seperator
         self._show_proof = show_proof
+
         self._espilon = epsilon
         self._M = M
+        self._max_cgf_solver_iter = max_cgf_solver_iter
+        self._max_cgf_solver_time = max_cgf_solver_time
+        self._minimal_function_cache_path = minimal_function_cache_path
 
     def solve(self, binvarow, binvc, f):
         r"""Solves the paramaterized problem. 
@@ -588,6 +597,7 @@ class cutGenerationProblem:
             # return gmic, the feasible set for the optimization problem is a single point which corresponds to gmic.
             return pi_p
         # ensure a breakpoint sequence is given
+        if len(sparse_bkpt) > self._
         sparse_bkpt.sort()
         f_index = sparse_bkpt.index(frac_f)
         self._cut_score.set_f_index(f_index)
@@ -606,10 +616,10 @@ class cutGenerationProblem:
         val_result = [QQ(gamma_i) for gamma_i in point[num_bkpt:]]
         bkpt_result = [QQ(lambda_i) for lambda_i in point[:num_bkpt]]
         pi_p = piecewise_function_from_breakpoints_and_values(bkpt_result+[1], val_result+[0])
+        log_problem_result(bkpt_result, val_result, binvarow, binvc, f)
         if self._prove_seperator:
             res = minimality_test(pi_p, self._show_proof) # add someway to log certificates. 
             cut_gen_logger.info(f"Minimality of cgf: {res}")
-        log_problem_result(bkpt_result, val_result, binvarow, binvc, f)
         return pi_p
 
     def _algorithm_value_poly_lp(self, binvarow, binvc, f):
@@ -652,10 +662,10 @@ class cutGenerationProblem:
         result = self._solver.lp_solve(cons, lp_obj_in_solver_type)
         vals = [QQ(v) for v in result]
         pi_p = piecewise_function_from_breakpoints_and_values(bkpt + [1], vals+ [0])
-        cut_gen_logger.info(f"{pi_p} is the found function for the row: {binvarow}, objective:{binvc},and f{f}")
+        log_problem_result(bkpt_result, val_result, binvarow, binvc, f)
         if self._prove_seperator:
-            res = minimality_test(pi_p, True) # add someway to log certificates. 
-            cut_gen_logger.info(f"minimality of  {pi_p}: {res}")
+            cut_gen_logger.info(f"Minimality of cgf: {res}")
+
         return pi_p
         
     def _algorithm_custom(self, binvarow, binvc, f):
