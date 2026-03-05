@@ -1,6 +1,6 @@
 from sys import argv as system_args
 from cutgeneratingfunctionology.igp import *
-import time 
+import time
 import os
 from numpy import std
 from random import sample
@@ -9,16 +9,16 @@ import logging
 inital_gen_logger = logging.getLogger(__name__)
 
 # read bash inputs
-k = int(system_args[1]) # for now keep k small, <= 9 from initial testing. 
+k = int(system_args[1]) # for now keep k small, <= 9 from initial testing.
 sample_size = int(system_args[2]) # pick a value between 2 and 100;
 time_per_batch = float(system_args[3]) # minutes
-max_number_of_rows = int(system_args[4]) 
+max_number_of_rows = int(system_args[4])
 max_std = float(system_args[5])
 try:
     which_backend = str(system_args[6]) # a string specifying backend, optional.
 except IndexError:
     which_backend = None
-try: 
+try:
     overhead_time = float(system_args[7]) # minutes
 except:
     overhead_time = 5
@@ -48,7 +48,6 @@ assert(sample_size >= 2)
 assert(sample_size <= 100)
 assert(max_number_of_rows >= 1)
 inital_gen_logger.info("Computing breakpoints...")
-logging.disable()
 bkpts = BreakpointComplexClassContainer(k)
 
 # bkpts.write_data(max_rows=max_lines_in_file)
@@ -58,18 +57,19 @@ num_bkpts_seqs = len(list(bkpts.get_rep_elems()))
 inital_gen_logger.info(f"Number of breakpoints: {num_bkpts_seqs}.\nDetermining run time estimate.")
 sample_space = sample(list(bkpts.get_rep_elems()), k = sample_size)
 inital_gen_logger.info("Sample space found; computing sample points...")
+# use real time estimations
 start = time.time()
-find_minimal_function_reps_from_bkpts(sample_space)
+find_minimal_function_reps_from_bkpts(sample_space, backend=which_backend)
 end = time.time()
 average_sample_time = (end - start) / sample_size
 inital_gen_logger.info(f"Sample computation time averages {average_sample_time:.2f} second per breakpoint sequence.")
-# find time to be used per batch. 
-# Infer a reasonable time estimate based on user specifications and measured data. 
-# we don't want to request more time than needed on accident. 
+# find time to be used per batch.
+# Infer a reasonable time estimate based on user specifications and measured data.
+# we don't want to request more time than needed on accident.
 
 
 
-# fix dim analysis here
+# check dim analysis here, it looks right.
 estimated_cpu_time = average_sample_time * num_bkpts_seqs
 inital_gen_logger.info(f"Total estimated cpu time is {estimated_cpu_time/60:.2f} minutes")
 inital_gen_logger.info("Finding output size in rows and number of batches ...")
@@ -88,7 +88,7 @@ sample_std =  std(sample_space)
 if overhead_time*60 > sample_std * max_std:
     time_alloc = time_per_batch + overhead_time
 else:
-    time_alloc = time_per_batch + (num_rows*sample_std * max_std)/60 
+    time_alloc = time_per_batch + (num_rows*sample_std * max_std)/60
 print(f"Allocated time batch: {time_alloc:.2f} minutes.")
 print(f"Allocating {time_alloc * number_of_batches:.2f} minutes of CPU time.")
 
@@ -109,14 +109,14 @@ if run_computation is None:
         else:
             print("Please input either Y or N to continue or not")
     # prompt user to set run_computation, if not already set
-    
 
-#os.putenv(RUN_JOBS, run_computation) # some type of bool  do 
+
+#os.putenv(RUN_JOBS, run_computation) # some type of bool  do
 if run_computation:
     # write breakpoints
+    bkpts.write_data(max_rows=max_number_of_rows)
     # Set ENV variables for this run
     # record file writing location and add to path.
-    #os.putenv(NUM_ROWS, number_of_rows)
-    #os.putenv(NUM_JOBS, number_of_batches)
-    #os.putenv(ALLOC_TIME_PER_JOBS, time_alloc)
-    pass
+    os.putenv(NUM_ROWS, number_of_rows)
+    os.putenv(NUM_JOBS, number_of_batches)
+    os.putenv(ALLOC_TIME_PER_JOB, time_alloc)
