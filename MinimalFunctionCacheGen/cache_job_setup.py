@@ -114,9 +114,16 @@ if run_computation is None:
 #os.putenv(RUN_JOBS, run_computation) # some type of bool  do
 if run_computation:
     # write breakpoints
+    os.chdir(os.getenv("BKPTS_PATH"))
     bkpts.write_data(max_rows=max_number_of_rows)
+    os.chdir(os.getenv("MFC_TEMP"))
+    with open("temp_job_info.sh", "w") as run_vars_file:
+        run_vars_file.write(f"NUM_ROWS={number_of_rows}\n")
+        run_vars_file.write(f"NUM_JOBS={number_of_batches}\n")
+        run_vars_file.write(f"ALLOC_TIME_PER_JOB={time_alloc}")
+    # os.close("temp_job_info.sh")
     # Set ENV variables for this run
     # record file writing location and add to path.
-    os.putenv(NUM_ROWS, number_of_rows)
-    os.putenv(NUM_JOBS, number_of_batches)
-    os.putenv(ALLOC_TIME_PER_JOB, time_alloc)
+    # os.putenv("NUM_ROWS", str(number_of_rows))
+    # os.putenv("NUM_JOBS", str(number_of_batches))
+    # os.putenv("ALLOC_TIME_PER_JOB", str(time_alloc))

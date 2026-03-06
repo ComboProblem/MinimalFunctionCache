@@ -14,12 +14,9 @@ MAX_STD = 5 # used in time estimages
 MAX_NUM_ROW = 1000 # in each breakpoint file.
 BACKEND = "pplite"
 
-export BATCH_SIZE
-export NUM_BATCH
-export ALLOC_TIME_PER_JOB
-
-
-
+export BKPTS_PATH = "~/MinimalFunctionCache/Breakpoints/$NUM_BKPT"
+mkdir ~/MinimalFunctionCache/TEMP
+export MFC_TEMP = "~/MinimalFunctionCache/TEMP"
   # SBATCH --
   # SBATCH --partition=low
   # SBATCH --ntasks=1
@@ -32,7 +29,7 @@ export ALLOC_TIME_PER_JOB
   # load module(s)
   module purge
   module load apptainer
-
+e
   # specify what path(s) to bind inside the apptainer
   export $APPTAINER_BIND=$PWD
 
