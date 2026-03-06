@@ -69,7 +69,7 @@ class SolverError(Exception):
     pass
 
 
-class FeasiblityError(Exception):
+class SolverHalt(Exception):
     pass
 
 
@@ -79,8 +79,8 @@ class SolverTimeOut(Exception):
 
 class cgfTimer:
     def __init__(self, max_time):
-        if max_time < 0:
-            max_time = -1
+        if max_time is None:
+            max_time = 2**63-1
         self._max_time = max_time
         self._start_time  =  time.process_time()
 
@@ -180,6 +180,8 @@ class cutScore:
         self._sage_to_solver_type = None
         self._timer = None
         self._feasible_point = None
+        self._rel_tol = 10**-6
+        self._prev_result = None
         if "obj_type" in kwrds.keys():
             self._cut_obj_type = kwrds.keys()["obj_type"]
         else:
@@ -216,11 +218,19 @@ class cutScore:
         row_data = self.get_MIP_row()
         sage_cut = [pi(fractional(QQ(bar_a_ij))) for bar_a_ij in row_data]
         sage_mip_obj =  [QQ(bar_cj) for bar_cj in self._MIP_objective]
-        result = self.get_sage_to_solver_type()(self._cut_score.cut_score(sage_cut, sage_mip_obj))
+        sage_result = self._cut_score.cut_score(sage_cut, sage_mip_obj)
+        if self.get_prev_result() is not None:
+            if abs(sage_result - self.get_prev_result())/sage_result < self._rel_tol:
+                cut_gen_logger.debug(f"cutScore.__call__: Relalitve difference betweeen successive solutions is less than {self._rel_tol}. Stopping non-linear solver.")
+                raise SolverHalt
+            else:
+                self.set_prev_result(sage_result)
+        else:
+            self.set_prev_result(sage_result)
         if self._timer is not None:
             if self._timer.solver_time_out():
                 raise SolverTimeOut
-        return result
+        return self.get_sage_to_solver_type()(sage_result)
         
     @staticmethod
     def grad(parameters):
@@ -263,6 +273,9 @@ class cutScore:
         For fixed row i of the corner polyhedron;  bar_i - (bar a_i)^T x_N 
         """
         return self._MIP_row
+        
+    def get_prev_result(self):
+        return self._prev_result
     
     def get_sage_to_solver_type(self):
         """
@@ -286,6 +299,9 @@ class cutScore:
     def set_feasible_point(self, point):
         self._feasible_point = point    
 
+    def set_lipschitz_constant(self, M):
+        self._M = M
+
     def set_MIP_row(self, new_row):
         self._MIP_row = new_row
 
@@ -296,9 +312,12 @@ class cutScore:
         This should be a vector of length n-m for the problem. 
         """
         self._MIP_objective = new_objective
+        
+    def set_prev_result(self, prev_result):
+        self._prev_result = prev_result
 
-    def set_lipschitz_constant(self, M):
-        self._M = M
+    def set_rel_tol(self, rel_tol):
+        self._rel_tol = rel_tol
 
     def set_sage_to_solver_type(self, new_conversion):
         self._sage_to_solver_type = new_conversion
@@ -331,32 +350,32 @@ class cutScore:
         # values should be in [0,1]
         for i in range(n):
             if (b[i] < 0 or b[i] + epsilon >= 1) and i != f_index:
-                raise FeasiblityError(f"breakpoint lambda_{i} < 0 or lambda_{i}>= 1; lambda_{i}=={b[i]}")
+                raise SolverHalt(f"validate_point: breakpoint lambda_{i} < 0 or lambda_{i}>= 1; lambda_{i}=={b[i]}")
             if (v[i] < 0 or v[i] + epsilon > 1) and i != f_index:
-                raise FeasiblityError(f"breakpoint gamma_{i} < 0 or gamma_{i}>= 1; gamma_{i}=={v[i]}")
+                raise SolverHalt(f"validate_point: breakpoint gamma_{i} < 0 or gamma_{i}>= 1; gamma_{i}=={v[i]}")
         # pi(0) = 0, pi(f) = 1
         if abs(b[0]-0) <= epsilon:
             b[0] = 0
         else:
             cut_gen_logger.debug(f"validate_point: breakpoint lambda_0 >0, point: {point}, cell: {cell}")
-            raise FeasiblityError("breakpoint lambda_0 >0")
+            raise SolverHalt("breakpoint lambda_0 >0")
         if abs(v[0]-0) <= epsilon:
             v[0] = 0
         else:
             cut_gen_logger.debug(f"validate_point: breakpoint gamma_0 >0, point: {point}, cell: {cell}")
-            raise FeasiblityError("value gamma_0 >0")
+            raise SolverHalt("value gamma_0 >0")
         # bkpt[f_index] == f
         if abs(b[f_index] - f_trust) <= epsilon:
             b[f_index] = f_trust
         else:
             cut_gen_logger.debug(f"validate_point: breakpoint lambda_{f_index} != {f_trust}: point: {point}, cell: {cell}")
-            raise FeasiblityError(f"breakpoint lambda_{f_index} != {f_trust}")
+            raise SolverHalt(f"breakpoint lambda_{f_index} != {f_trust}")
         # pi_p(f) = 1
         if abs(v[f_index] - 1) <= epsilon:
             v[f_index] = 1
         else:
             cut_gen_logger.debug(f"validate_point: breakpoint lambda_{f_index} !=1: point: {point}, cell: {cell}")
-            raise FeasiblityError(f"value gamma_{f_index} != 1")
+            raise SolverHalt(f"value gamma_{f_index} != 1")
         # lipschitz constant and contunity. 
         for i in range(n-1):
             if 0 < b[i+1]-b[i]<= epsilon:
@@ -364,12 +383,12 @@ class cutScore:
                     # potential discontunity
                     # not in (epsilon_i, M) - charts. 
                     cut_gen_logger.debug(f"validate_point: Solution does not have lipschitz constant {M}: point: {point}, cell: {cell}")
-                    raise FeasiblityError(f"Solution does not have lipschitz constant {M}")
+                    raise SolverHalt(f"Solution does not have lipschitz constant {M}")
                 # lambda_i+1 = lambda_i
                 b[i+1] = b[i]
                 # contunity, gamma_i =gamma_i+1
                 if abs(v[i+1]-v[i]) > epsilon:
-                    raise FeasiblityError
+                    raise SolverHalt
                 v[i+1] = v[i]
                 # when epsilon <= v[i+1]-v[i] < epsilon*M
                 # the solution exists in the intersection of the epsilon,M
@@ -377,7 +396,7 @@ class cutScore:
         # the last breakpoint should be distinct from 1 to enforce a breakpoint sequence.
         if 1-b[n-1] <= epsilon:
             cut_gen_logger.debug(f"validate_point: breakpoint lambda_{n-1} >= 1: point: {point}, cell: {cell}")
-            raise FeasiblityError(f"breakpoint lambda_{n-1} >= 1")
+            raise SolverHalt(f"breakpoint lambda_{n-1} >= 1")
         # b,v are rounded values.
         # ensure constraints hold
         # For a polynomial constraint, poly, assume poly(b,v) = 0. Then poly(point) = poly((b,v) + O(epsilon))
@@ -399,21 +418,21 @@ class cutScore:
                         # assume poly(b+v) == 0. 
                         if abs(poly(sage_point)) <= sum(abs(grad(sage_point)) for grad in poly.gradient())*epsilon:
                             cut_gen_logger.debug(f"validate_point: {poly} evaluated at {b+v} == 0 when {poly} evaluated at {b+v} should be < 0: point: {point}, cell: {cell}")
-                            raise FeasiblityError(f"{poly} evaluated at {b+v} == 0 when {poly} evaluated at {b+v} should be < 0")
+                            raise SolverHalt(f"{poly} evaluated at {b+v} == 0 when {poly} evaluated at {b+v} should be < 0")
                         else:
                             pass
                     else:
                         cut_gen_logger.debug(f"validate_point: {poly} evaluated at {b+v} >= 0 when {poly} evaluated at {b+v} should be < 0: point: {point}, cell: {cell}")
-                        raise FeasiblityError(f"{poly} evaluated at {b+v} >= 0 when {poly} evaluated at {b+v} should be < 0")
+                        raise SolverHalt(f"{poly} evaluated at {b+v} >= 0 when {poly} evaluated at {b+v} should be < 0")
             for poly in cell.le_poly():
                 if poly(b+v) > 0:
                     cut_gen_logger.debug(f"validate_point: {poly} evaluated at {b+v} >0 when {poly} evaluated at {b+v} should be <=  0: point: {point}, cell: {cell}")
-                    raise FeasiblityError(f"{poly} evaluated at {b+v} >0 when {poly} evaluated at {b+v} should be <= 0")      
+                    raise SolverHalt(f"{poly} evaluated at {b+v} >0 when {poly} evaluated at {b+v} should be <= 0")      
                 
             for poly in cell.eq_poly():
                 if abs(poly(b+v)) >= epsilon or abs(poly(sage_point)) > sum(abs(grad(sage_point)) for grad in poly.gradient())*epsilon:
                     cut_gen_logger.debug(f"validate_point:{poly} evaluated at {b+v} != 0 when {poly} evaluated at {b+v} should be == 0: point: {point}, cell: {cell}")
-                    raise FeasiblityError(f"{poly} evaluated at {b+v} != 0 when {poly} evaluated at {b+v} should be == 0")
+                    raise SolverHalt(f"{poly} evaluated at {b+v} != 0 when {poly} evaluated at {b+v} should be == 0")
         return b,v
 
 
@@ -453,8 +472,8 @@ class cutGenerationProblem:
     Option: prove_seperator - bool
     Option: epsilon - value to det
     """
-    def __init__(self, algorithm_name=None, cut_score=None, num_bkpt=None, multithread=False, prove_seperator=True, show_proof=False,
-        epsilon=10**-7, M = 10**7, max_cgf_solver_iter=None, max_cgf_solver_time=-1, paramaterized_problem_solver=None, 
+    def __init__(self, algorithm_name=None, cut_score=None, num_bkpt=None, multithread=False, prove_seperator=False, show_proof=False,
+        epsilon=10**-7, M = 10**7, rel_tol=10**-6, max_cgf_solver_time=None, paramaterized_problem_solver=None, 
         minimal_function_cache_path = None, backend=None):
         if algorithm_name is None or algorithm_name.lower() == "full":
             self._algorithm_name = "full"
@@ -484,7 +503,10 @@ class cutGenerationProblem:
         self._backend = backend
         self._espilon = epsilon
         self._M = M
-        self._max_cgf_solver_iter = max_cgf_solver_iter
+        self._rel_tol = rel_tol
+        self._cut_score.set_rel_tol(self._rel_tol)
+        self._cut_score.set_espilon(self._espilon)
+        self._cut_score.set_lipschitz_constant(self._M)
         self._max_cgf_solver_time = max_cgf_solver_time
         self._minimal_function_cache_path = minimal_function_cache_path
 
@@ -512,8 +534,6 @@ class cutGenerationProblem:
         """
         self._cut_score.set_MIP_row(binvarow)
         self._cut_score.set_MIP_obj(binvc)
-        self._cut_score.set_espilon(self._espilon)
-        self._cut_score.set_lipschitz_constant(self._M)
         self._cut_score.set_f_trust(f)
         frac_f = fractional(QQ(f))
         def cut_score(params):
@@ -557,7 +577,7 @@ class cutGenerationProblem:
                     # Call a NL solver, attempt to solve the cell optimization problem.
                     try:
                         self._solver.nonlinear_solve(cut_score, point, subdomain_solver_constraints)
-                    except FeasiblityError:
+                    except SolverHalt:
                         pass
                     except SolverTimeOut:
                         # use the last good point to see if we have improvement before timing out our compuation
@@ -575,7 +595,7 @@ class cutGenerationProblem:
                                 solution_for_best_result = point
                                 rep_elem_of_best_cell = b+v                        
                         break
-                    # When a FeasiblityError is encountered 
+                    # When a SolverHalt is encountered 
                     # the NL solver has violated a constraint of the model or minimality
                     # within the cell. Use the last known feasible point from the 
                     # solver.
@@ -620,8 +640,6 @@ class cutGenerationProblem:
         """
         self._cut_score.set_MIP_row(binvarow)
         self._cut_score.set_MIP_obj(binvc)
-        self._cut_score.set_espilon(self._espilon)
-        self._cut_score.set_lipschitz_constant(self._M)
         self._cut_score.set_f_trust(f)
         problem_timer = cgfTimer(self._max_cgf_solver_time)
         self._cut_score.set_timer(problem_timer)
@@ -667,7 +685,7 @@ class cutGenerationProblem:
         value_polyhedron_constraints = self._solver.write_linear_constraints_from_bsa(value_polyhedron)
         try:
             result = self._solver.nonlinear_solve(cut_score, point, value_polyhedron_constraints)
-        except FeasiblityError:
+        except SolverHalt:
             pass
         except SolverTimeOut:
             self._cut_score.set_timer(None)
