@@ -6,7 +6,7 @@ rep_elm_gen_logger = logging.getLogger(__name__)
 rep_elm_gen_logger.setLevel(logging.INFO)
 
 k = int(system_args[1])
-job_number = os.
+job_number = os.getenv("JOB_NUMBER")
 path = os.path.curdir
 rep_elm_gen_logger.info(f"Hello from job {job_number}.")
 input_file_name = None
@@ -20,4 +20,3 @@ if input_file_name is in path:
     PiMin_worker.write(output_file_name)
 else:
     rep_elm_gen_logger.error(f"{input_file_name} is not found in {path}.}")
-    

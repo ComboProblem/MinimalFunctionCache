@@ -7,7 +7,7 @@ from random import sample
 import logging
 
 inital_gen_logger = logging.getLogger(__name__)
-inital_gen_logger.setLevel(logging.info)
+inital_gen_logger.setLevel(logging.INFO)
 # read bash inputs
 k = int(system_args[1]) # for now keep k small, <= 9 from initial testing.
 sample_size = int(system_args[2]) # pick a value between 2 and 100;
@@ -91,7 +91,7 @@ if number_of_rows > max_number_of_rows:
 else:
     batch_time_less_than_estimated_computation_time = False
 number_of_batches = int(num_bkpts_seqs/number_of_rows) + 1
-mkdir ~/MinimalFunctionCache/TEMP
+# mkdir ~/MinimalFunctionCache/TEMP
 (f"Number of rows per bkpt file:  {number_of_rows}\nNumber of rows per min_fun_rep file: {number_of_rows*k} \nNumber of Batches: {number_of_batches}")
 inital_gen_logger.info("Inferring batch time estimate based on parameters")
 sample_std =  std(sample_space)
