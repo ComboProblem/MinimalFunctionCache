@@ -17,4 +17,4 @@ try:
     os.chdir(os.getenv("REP_ELEM_PATH"))
     PiMin_worker.write(output_file_name)
 except FileNotFoundError:
-    rep_elm_gen_logger.warning(f"{file_name} not found in {os.getenv("BKPTS_PATH")}")
+    rep_elm_gen_logger.warning(f"{input_file_name} not found in {os.getenv("BKPTS_PATH")}")
