@@ -7,7 +7,7 @@ rep_elm_gen_logger.setLevel(logging.INFO)
 job_number = int(os.getenv("SLURM_ARRAY_TASK_ID"))
 backend =  str(os.getenv("BACKEND"))
 k = int(os.getenv("NUM_BKPT"))
-file_name = f"bkpts_of_len_{k}_part_{job_number}.csv"
+input_file_name = f"bkpts_of_len_{k}_part_{job_number}.csv"
 os.chdir(os.getenv("BKPTS_PATH"))
 rep_elm_gen_logger.info(f"Starting computations for {job_number}.")
 try:
@@ -18,5 +18,3 @@ try:
     PiMin_worker.write(output_file_name)
 except FileNotFoundError:
     rep_elm_gen_logger.warning(f"{file_name} not found in {os.getenv("BKPTS_PATH")}")
-    
-
