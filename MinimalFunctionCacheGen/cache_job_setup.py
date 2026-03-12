@@ -34,7 +34,7 @@ except IndexError:
     pass
 batch_time_default = 10
 
-print(f"{time.time()}: Setting up SLURM job parameters.")
+print(f"Setting up SLURM job parameters.")
 if run_computation_default is not None:
     if run_computation_default.lower().strip(" ") == "n" or run_computation_default.lower().strip(" ") == "no":
         run_computation = False
@@ -57,10 +57,9 @@ assert(max_number_of_rows >= 1)
 #TODO: check if breakpoints have been written aready and load them if possible.
 
 inital_gen_logger.info("Computing breakpoints...")
+
 bkpts = BreakpointComplexClassContainer(k)
-
 # bkpts.write_data(max_rows=max_lines_in_file)
-
 # Estimate cpu time per computation per breakpoint
 num_bkpts_seqs = len(list(bkpts.get_rep_elems()))
 inital_gen_logger.info(f"Number of breakpoints: {num_bkpts_seqs}.\nDetermining run time estimate.")
@@ -92,32 +91,33 @@ else:
     batch_time_less_than_estimated_computation_time = False
 number_of_batches = int(num_bkpts_seqs/number_of_rows) + 1
 # mkdir ~/MinimalFunctionCache/TEMP
-(f"Number of rows per bkpt file:  {number_of_rows}\nNumber of rows per min_fun_rep file: {number_of_rows*k} \nNumber of Batches: {number_of_batches}")
+inital_gen_logger.info(f"Number of rows per bkpt file:  {number_of_rows}\nNumber of rows per min_fun_rep file: {number_of_rows*k} \nNumber of Batches: {number_of_batches}")
 inital_gen_logger.info("Inferring batch time estimate based on parameters")
 sample_std =  std(sample_space)
 if overhead_time*60 > sample_std * max_std:
     time_alloc = time_per_batch + overhead_time
 else:
     time_alloc = time_per_batch + (num_rows*sample_std * max_std)/60
-inital_gen_logger.info(f"Allocated time batch: {time_alloc:.2f} minutes.")
+time_alloc = int(time_alloc+1)
+inital_gen_logger.info(f"Allocated time batch: {time_alloc} minutes.")
 inital_gen_logger.info(f"Allocating {time_alloc * number_of_batches:.2f} minutes of CPU time.")
 
 # if not set to default run or stop, ask user to decide if the program should run
 if run_computation is None:
-    print(f"{time.time()}: Do you want to continue to run the computation? Y or N?")
+    print(f"Do you want to continue to run the computation? Y or N?")
     valid_input = False
     while not valid_input:
         cont = input()
         if cont.lower().strip(' ') == "n":
             run_computation = False
             valid_input = True
-            print(f"{time.time()}: Aborting run...")
+            print(f"Aborting run...")
         elif cont.lower().strip(' ') == "y":
             run_computation = True
             valid_input = True
-            print(f"{time.time()}: Run approved. Carrying on with computation.")
+            print(f"Run approved. Carrying on with computation.")
         else:
-            print(f"{time.time()}: Please input either Y or N to continue or not.")
+            print(f"Please input either Y or N to continue or not.")
     # prompt user to set run_computation, if not already set
 
 
