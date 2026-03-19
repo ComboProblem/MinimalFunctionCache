@@ -1,0 +1,6 @@
+#ignore build stuff
+build/
+.git/
+MinimalFunctionCache.egg-info/
+# Ignore slurm output files
+*.out
