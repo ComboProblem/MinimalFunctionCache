@@ -4,16 +4,19 @@ From: ubuntu:24.04
 %post -c /bin/bash
     apt-get update -y
     apt-get install -y pip git python3.12-full
-    git clone --branch MinFunStable https://github.com/ComboProblem/cutgeneratingfunctionology.git cutgeneratingfunctionology
     apt-get clean
+    git clone --branch MinFunStable https://github.com/ComboProblem/cutgeneratingfunctionology.git cutgeneratingfunctionology
     cd cutgeneratingfunctionology
     python3 -m venv /cgf-venv/venv
     source /cgf-venv/venv/bin/activate
     pip install ".[passagemath]"
     cd ~/
     pip install pplitepy
+    pip install pyscipopt
+    pip install scipy
     git clone https://github.com/ComboProblem/MinimalFunctionCache.git
-    
+    sage -sh -c "cd ~/MinimalFunctionCache; pip install .; exit"
+    cd ~/
 
 %environment
    source /cgf-venv/venv/bin/activate

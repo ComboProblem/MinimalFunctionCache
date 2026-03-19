@@ -1,6 +1,6 @@
 from setuptools import setup
 
 setup(
-    packages = ['cutGen'],
+    packages = ['cutGen', 'cacheUtils'],
     include_package_data=True,
 )
