@@ -8,7 +8,7 @@ def minimal_function_cache_dir():
     """
     Returns directory information for accessing the minimal function cache.
     """
-    function_cache_path = importlib_resources.files("cacheUtils")
+    function_cache_path = importlib_resources.files("minimalFunctionCache")
     breakpoint_base_path = function_cache_path / 'Breakpoints'
     rep_elem_base_path = function_cache_path / 'RepElems'
     return {"function_cache_path":function_cache_path, "breakpoint_base_path":breakpoint_base_path, "rep_elem_base_path":rep_elem_base_path }
@@ -73,7 +73,7 @@ def minimal_function_cache_loader(n, breakpoints_or_rep_elems, prototype=QQ):
                     bkpts.append([prototype(data) for data in row])
         return rep_elems
     else:
-        raise ValueError("A cache has not been loaded, check spelling and inputs")
+        raise ValueError("A cache has not been loaded, check spelling and inputs.")
 
 
 

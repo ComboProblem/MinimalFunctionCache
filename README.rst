@@ -53,6 +53,10 @@ Installation
     cd MinimalFunctionCache
     pip install .
 
+- (Optionally:) Install pplite::
+
+    pip install pplitepy
+
 - Start using the function cache in sagemath::
 
     cd ..
