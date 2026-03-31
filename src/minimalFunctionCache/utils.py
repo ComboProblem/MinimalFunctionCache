@@ -1,8 +1,11 @@
 import os
 import csv
+import logging
 import importlib.resources as importlib_resources
 from sage.rings.rational_field import QQ
 
+
+utils_logger = logging.getLogger(__name__)
 
 def minimal_function_cache_dir():
     """
@@ -51,7 +54,8 @@ def minimal_function_cache_loader(n, breakpoints_or_rep_elems, prototype=QQ):
     fun_cache_dir = minimal_function_cache_dir()
     cache_info = minimal_function_cache_info()
     if breakpoints_or_rep_elems.strip(" ").lower() == "breakpoints":
-        if n not in cache_info["avail_rep_elems"]:
+        if n not in cache_info["avail_bkpts"]:
+            utils_logger.info(f"Breakpoint cache {n} not found")
             raise ValueError(f"The breakpoint cache for {n} has not been computed.")
         bkpts = []
         bkpt_path = fun_cache_dir["breakpoint_base_path"] / str(n)
@@ -62,7 +66,8 @@ def minimal_function_cache_loader(n, breakpoints_or_rep_elems, prototype=QQ):
                     bkpts.append([prototype(data) for data in row])
         return bkpts
     elif breakpoints_or_rep_elems.strip(" ").lower() == "rep_elems":
-        if n not in cache_info["avail_bkpts"]:
+        if n not in cache_info["avail_rep_elems"]:
+            utils_logger.info(f"Rep elem cache {n} not found")
             raise ValueError(f"The function cache for {n} has not been computed.")
         rep_elems = []
         rep_elem_path = fun_cache_dir["rep_elem_base_path"] / str(n)
