@@ -1,10 +1,12 @@
-# Minimal Function Cache
+Minimal Function Cache
+~~~~~~~~~~~~~~~~~~~~~~
 
 Minimal Function Cache is a repository for a proposed cut generation method in the thesis of Acadia Larsen which uses an explicit method select optimal cuts over a space of valid intersection cuts for a given MIP relaxation basis. 
 
-The repository is in an alpha state. 
+The repository is in an alpha state. User be ware.
 
-## Included Software and Tools
+Included Software and Tools
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - Experimental Cut and Branch Solver using explicitly optimized cuts over the space of minimal functions with a finite number of breakpoints. 
 
@@ -14,35 +16,50 @@ The repository is in an alpha state.
 
 - Reproducible computational experiments.
 
-# Goals and Non-Goals
+Goals and Non-Goals
+~~~~~~~~~~~~~~~~~~~
 
-## Goals
  - Illustrate concept of explicit optimal cut selection. 
  - Reproducible on local and HPC machines.
  - Mathematical correctness of cut generation.
  - Interface with current optimization software ``pyscipopt``.
  - Demonstrate use of ``passsagemath`` in application.
    
-## Non-goals
+Non-goals
+~~~~~~~~~
  - Performance and code optimization; the cut generation technique presented is a proof of concept and is intended to function (for practical problem) with an excess of compute.
  - Documentation light, code follows thesis. 
 
-# Installation
+Installation
+~~~~~~~~~~~~
 
-
-- Clone the GitHub repository https://github.com/ComboProblem/cutgeneratingfunctionology/tree/MinFunStable.git::
+- Clone the GitHub repository https://github.com/ComboProblem/cutgeneratingfunctionology/tree/MinFunStable.git and https://github.com/ComboProblem/MinimalFunctionCache.git::
 
     git clone https://github.com/ComboProblem/cutgeneratingfunctionology/tree/MinFunStable.git
+    git clone https://github.com/ComboProblem/MinimalFunctionCache.git
     cd cutgeneratingfunctionology
 
-- (Optional) Create a virtual environment::
+- Create a virtual environment::
 
     python3 -m venv venv-cgf
-    . venv-cgf/bin/activate
+    source venv-cgf/bin/activate
 
 - Install the cutgeneratingfunctionology package using pip::
 
     pip install ".[passagemath]"
 
-# License 
+- Install the MinimalFunctionCache using pip::
+
+    cd MinimalFunctionCache
+    pip install .
+
+- Start using the function cache in sagemath::
+
+    cd ..
+    sage
+    sage: from cutgenerationfunctionology.igp import PiMinConatiner
+    sage: MinFun_with_at_most_5_breakpoints = PiMinConatiner(5) # loaded with the function cache!
+
+License 
+~~~~~~~
 The code is released under the GNU General Public License, version 2, or any later version as published by the Free Software Foundation.

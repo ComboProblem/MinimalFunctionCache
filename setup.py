@@ -1,6 +1,6 @@
 from setuptools import setup
 
 setup(
-    packages = ['cutGen', 'cacheUtils'],
+    packages = ['minimalFunctionCache', 'parametricCutGen'],
     include_package_data=True,
 )
