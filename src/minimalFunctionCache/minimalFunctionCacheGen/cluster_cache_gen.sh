@@ -2,7 +2,7 @@
 #-x is useful for debugging.
 
 # Get run parameters.
-source ~/cache_gen_run_parameters.sh
+source ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/cache_gen_run_parameters.sh
 
 # Set up file system
 mkdir ~/MinimalFunctionCache/TEMP
@@ -20,9 +20,9 @@ if [ ! -f cgf.sif ]; then
 fi
 
 # Run the inital set up.
-# chmod +x ~/setup_cache_run.sh
+chmod +x ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/setup_cache_run.sh
 # sbatch --partition=$PARTITION --account=$CLUSTER_ACCOUNT --ntasks=1 --cpus-per-task=1 --time=$  apptainer run cgf.sif python3 ~/MinimalFunctionCache/MinimalFunctionCacheGen/cache_job_setup.py $NUM_BKPT $SAMPLE_SIZE $TIME_PER_BATCH $MAX_NUM_ROW $MAX_STD $BACKEND $OVERHEAD_TIME_PER_BATCH $RUN_COMPUATION
-sbatch --partition=$PARTITION --ntasks=1 --cpus-per-task=1 --time=$INITAL_TIME:00  apptainer run cgf.sif python3 ~/MinimalFunctionCache/MinimalFunctionCacheGen/cache_job_setup.py $NUM_BKPT $SAMPLE_SIZE $TIME_PER_BATCH $MAX_NUM_ROW $MAX_STD $BACKEND $OVERHEAD_TIME_PER_BATCH $RUN_COMPUATION
+sbatch --partition=$PARTITION --ntasks=1 --cpus-per-task=1 --time=$INITAL_TIME:00  ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/setup_cache_run.sh
 
 # Now load job info
 source ~/MinimalFunctionCache/TEMP/temp_job_info.sh
@@ -37,7 +37,9 @@ else
   echo "Starting Run."
 fi
 
-sbatch --array0-$NUM_JOBS --partition=$PARTITION --account=$CLUSTER_ACCOUNT --ntasks=1 --time=$ALLOC_TIME_PER_JOB:00 --mem=$MEM apptainer run cgf.sif python3 ~/MinimalFunctionCache/MinimalFunctionCacheGen/gen_rep_elems_for_cache_from_file.py
+
+chmod +x ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/job_function_runner.sh
+sbatch --array0-$NUM_JOBS --partition=$PARTITION --account=$CLUSTER_ACCOUNT --ntasks=1 --time=$ALLOC_TIME_PER_JOB:00 --mem=$MEM ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/job_function_runner.sh
 
 if [ $SAVE_BKPTS ]; then
   if [ ! -d ~/MinimalFunctionCache/src/minimalFunctionCache/Breakpoints/$NUM_BKPTS ]; then
