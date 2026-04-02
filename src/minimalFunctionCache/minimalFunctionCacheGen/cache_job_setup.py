@@ -153,3 +153,4 @@ else:
     with open("temp_job_info.sh", "w") as run_vars_file:
         run_vars_file.write("#!/bin/bash\n")
         run_vars_file.write(f"export RUN_COMPUTATION=0")
+os.exit()

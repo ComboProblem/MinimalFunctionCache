@@ -17,7 +17,9 @@ export OVERHEAD_TIME_PER_BATCH=5 # in minutes
 export MAX_STD=5 # used in time estimages
 export MAX_NUM_ROW=1000 # in each breakpoint file.
 export BACKEND="pplite"
+export OVERHEAD_TIME=5
 export LOGGING_LEVEL="" #debug, warning, or error, anything else will default to info
+export RUN_COMPUTAION=yes
 
 # Locations of paths
 export MFC_TEMP="~/MinimalFunctionCache/TEMP"
