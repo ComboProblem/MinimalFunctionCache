@@ -16,7 +16,7 @@ mkdir ~/MinimalFunctionCache/TEMP/RepElems/$NUM_BKPT
 # module purge
 module load apptainer
 if [ ! -f cgf.sif ]; then
-  apptainer build cgf.sif ~/Apptainer.def
+  apptainer build cgf.sif ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/Apptainer.def
 fi
 
 # Run the inital set up.
@@ -26,9 +26,6 @@ sbatch --partition=$PARTITION --ntasks=1 --cpus-per-task=1 --time=$INITAL_TIME:0
 
 # Now load job info
 source ~/MinimalFunctionCache/TEMP/temp_job_info.sh
-
-
-
 
 # check if we should keep goin'
 if [$RUN_COMPUTATION == '0']; then
