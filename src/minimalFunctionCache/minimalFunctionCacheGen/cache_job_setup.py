@@ -39,7 +39,7 @@ try:
 except IndexError:
     run_computation_default = None
 
-if inital_gen_logger.getLevel is logging.DEBUG:
+if inital_gen_logger.level is logging.DEBUG:
     logging.debug({"k":k, "sample_size":sample_size, "time_per_batch":time_per_batch, "max_number_of_rows":max_number_of_rows, "max_std":max_std, "which_backend":which_backend, "overhead_time":overhead_time, "run_computation_default":run_computation_default})
 
 
