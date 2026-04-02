@@ -6,7 +6,7 @@ export PARTITION=high
 export MEM=4gb
 export INITAL_TIME=120
 # Set cache computation parameters
-export NUM_BKPT=2
+export NUM_BKPT=4
 export SAVE_BKPTS=true
 export SAVE_REP_ELEMS=true
 export SUBMIT_TO_GITHUB=true
@@ -17,6 +17,7 @@ export OVERHEAD_TIME_PER_BATCH=5 # in minutes
 export MAX_STD=5 # used in time estimages
 export MAX_NUM_ROW=1000 # in each breakpoint file.
 export BACKEND="pplite"
+export LOGGING_LEVEL="" #debug, warning, or error, anything else will default to info
 
 # Locations of paths
 export MFC_TEMP="~/MinimalFunctionCache/TEMP"

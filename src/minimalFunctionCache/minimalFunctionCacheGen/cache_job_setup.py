@@ -7,8 +7,20 @@ from random import sample
 import logging
 
 inital_gen_logger = logging.getLogger(__name__)
-inital_gen_logger.setLevel(logging.INFO)
+logging_level = os.getenv("LOGGING_LEVEL")
+if logging_level == "debug":
+    inital_gen_logger.INFO(f"Adjusting the default logging level to DEBUG")
+    inital_gen_logger.setLevel(logging.DEBUG)
+elif logging_level == "warning":
+    inital_gen_logger.INFO(f"Adjusting the default logging level to WARNING")
+    inital_gen_logger.setLevel(logging.WARNING)
+elif logging_level == "error":
+    inital_gen_logger.INFO(f"Adjusting the default logging level to ERROR")
+    inital_gen_logger.setLevel(logging.ERROR)
+else:
+    inital_gen_logger.setLevel(logging.INFO)
 # read bash inputs
+
 k = int(system_args[1]) # for now keep k small, <= 9 from initial testing.
 sample_size = int(system_args[2]) # pick a value between 2 and 100;
 time_per_batch = float(system_args[3]) # minutes
@@ -20,18 +32,17 @@ except IndexError:
     which_backend = None
 try:
     overhead_time = float(system_args[7]) # minutes
-except:
+except IndexError:
     overhead_time = 5
 try:
     run_computation_default = str(system_args[8])
 except IndexError:
     run_computation_default = None
-try:
-    logging_on = bool(system_args[9])
-    if not logging_on:
-        inital_gen_logger.setLevel(logging.error)
-except IndexError:
-    pass
+
+if inital_gen_logger.getLevel is logging.DEBUG:
+    logging.debug({"k":k, "sample_size":sample_size, "time_per_batch":time_per_batch, "max_number_of_rows":max_number_of_rows, "max_std":max_std, "which_backend":which_backend, "overhead_time":overhead_time, "run_computation_default":run_computation_default})
+
+
 batch_time_default = 10
 
 print(f"Setting up SLURM job parameters.")
@@ -48,7 +59,6 @@ if run_computation_default is not None:
 else:
     run_computation = None
     inital_gen_logger.info("Will ask about running full computation later.")
-
 assert(k >= 2)
 assert(time_per_batch >= batch_time_default)
 assert(sample_size >= 2)
@@ -62,7 +72,7 @@ bkpts = BreakpointComplexClassContainer(k)
 # bkpts.write_data(max_rows=max_lines_in_file)
 # Estimate cpu time per computation per breakpoint
 num_bkpts_seqs = len(list(bkpts.get_rep_elems()))
-inital_gen_logger.info(f"Number of breakpoints: {num_bkpts_seqs}.\nDetermining run time estimate.")
+inital_gen_logger.info(f"Number of breakpoints sequences: {num_bkpts_seqs}.\nDetermining run time estimate.")
 sample_space = sample(list(bkpts.get_rep_elems()), k = sample_size)
 inital_gen_logger.info("Sample space found; computing sample points...")
 # use real time estimations
