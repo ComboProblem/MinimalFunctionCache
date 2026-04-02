@@ -4,4 +4,4 @@ source ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/c
 source ~/MinimalFunctionCache/TEMP/temp_job_info.sh
 
 module load apptainer
-apptainer run cgf.sif python3 ~/MinimalFunctionCache/MinimalFunctionCacheGen/gen_rep_elems_for_cache_from_file.py
+apptainer run cgf.sif python3 ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/gen_rep_elems_for_cache_from_file.py

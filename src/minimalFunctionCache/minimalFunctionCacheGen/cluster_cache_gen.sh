@@ -47,7 +47,7 @@ if [ $SAVE_BKPTS ]; then
   if [ ! -d ~/MinimalFunctionCache/src/minimalFunctionCache/Breakpoints/$NUM_BKPTS ]; then
     mkdir ~/MinimalFunctionCache/src/minimalFunctionCache/Breakpoints/$NUM_BKPTS
   fi
-  rm ~/MinimalFunctionCache/src/minimalFunctionCache/Breakpoints/$NUM_BKPTS*.csv
+  rm ~/MinimalFunctionCache/src/minimalFunctionCache/Breakpoints/$NUM_BKPTS/*.csv
   mv ~/MinimalFunctionCache/TEMP/Breakpoints/$NUM_BKPT  ~/MinimalFunctionCache/src/minimalFunctionCache/Breakpoints/$NUM_BKPTS
 fi
 
@@ -55,7 +55,7 @@ if [ $SAVE_REP_ELEMS ]; then
   if [ ! -d ~/MinimalFunctionCache/src/minimalFunctionCache/RepElems/$NUM_BKPTS ]; then
     mkdir ~/MinimalFunctionCache/src/minimalFunctionCache/RepElems/$NUM_BKPTS
   fi
-  rm ~/MinimalFunctionCache/src/minimalFunctionCache/RepElems/$NUM_BKPTS*.csv
+  rm ~/MinimalFunctionCache/src/minimalFunctionCache/RepElems/$NUM_BKPTS/*.csv
   mv ~/MinimalFunctionCache/TEMP/RepElems/$NUM_BKPTS ~/MinimalFunctionCache/src/minimalFunctionCache/RepElems/$NUM_BKPTS
 fi
 
