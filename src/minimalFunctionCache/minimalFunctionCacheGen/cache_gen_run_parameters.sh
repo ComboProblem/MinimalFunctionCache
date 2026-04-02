@@ -1,7 +1,7 @@
 #!/bin/bash -x
 
 #SLURM JOB INFORMATION
-# export CLUSTER_ACCOUNT=<account_name>
+export CLUSTER_ACCOUNT=math-grp
 export PARTITION=high
 export MEM=4gb
 export INITAL_TIME=120
