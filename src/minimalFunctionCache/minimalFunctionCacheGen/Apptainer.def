@@ -21,4 +21,4 @@ From: ubuntu:24.04
     cd ~/
 
 %environment
-   source /cgf-venv/bin/activate
+   source ./cutgeneratingfunctionology/cgf-venv/bin/activate
