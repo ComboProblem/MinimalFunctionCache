@@ -44,6 +44,7 @@ chmod +x ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen
 sbatch --array=0-$NUM_JOBS --partition=$PARTITION --account=$CLUSTER_ACCOUNT --ntasks=1 --time=$ALLOC_TIME_PER_JOB:00 --mem=$MEM ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/job_function_runner.sh
 
 if [ $SAVE_BKPTS ]; then
+  echo "saving breakpoints"
   if [ ! -d ~/MinimalFunctionCache/src/minimalFunctionCache/Breakpoints/$NUM_BKPTS ]; then
     mkdir ~/MinimalFunctionCache/src/minimalFunctionCache/Breakpoints/$NUM_BKPTS
   fi
@@ -52,6 +53,7 @@ if [ $SAVE_BKPTS ]; then
 fi
 
 if [ $SAVE_REP_ELEMS ]; then
+  echo "saving repelems"
   if [ ! -d ~/MinimalFunctionCache/src/minimalFunctionCache/RepElems/$NUM_BKPTS ]; then
     mkdir ~/MinimalFunctionCache/src/minimalFunctionCache/RepElems/$NUM_BKPTS
   fi
@@ -59,6 +61,4 @@ if [ $SAVE_REP_ELEMS ]; then
   mv ~/MinimalFunctionCache/TEMP/RepElems/$NUM_BKPTS ~/MinimalFunctionCache/src/minimalFunctionCache/RepElems/$NUM_BKPTS
 fi
 
-
-rm -rf ~/MinimalFunctionCache/TEMP
     
