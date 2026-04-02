@@ -6,3 +6,5 @@ source ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/c
 
 module load apptainer
 apptainer run cgf.sif python3 ~/MinimalFunctionCache/MinimalFunctionCacheGen/cache_job_setup.py $NUM_BKPT $SAMPLE_SIZE $TIME_PER_BATCH $MAX_NUM_ROW $MAX_STD $BACKEND
+
+ls ~/MinimalFunctionCache/TEMP
