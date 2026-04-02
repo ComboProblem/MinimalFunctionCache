@@ -45,20 +45,17 @@ sbatch --array=0-$NUM_JOBS --partition=$PARTITION --account=$CLUSTER_ACCOUNT --n
 
 if [ $SAVE_BKPTS ]; then
   echo "saving breakpoints"
-  if [ ! -d ~/MinimalFunctionCache/src/minimalFunctionCache/Breakpoints/$NUM_BKPTS ]; then
-    mkdir ~/MinimalFunctionCache/src/minimalFunctionCache/Breakpoints/$NUM_BKPTS
-  fi
+  mkdir ~/MinimalFunctionCache/src/minimalFunctionCache/Breakpoints/$NUM_BKPTS
   rm ~/MinimalFunctionCache/src/minimalFunctionCache/Breakpoints/$NUM_BKPTS/*.csv
   mv ~/MinimalFunctionCache/TEMP/Breakpoints/$NUM_BKPT  ~/MinimalFunctionCache/src/minimalFunctionCache/Breakpoints/$NUM_BKPTS
 fi
 
 if [ $SAVE_REP_ELEMS ]; then
   echo "saving repelems"
-  if [ ! -d ~/MinimalFunctionCache/src/minimalFunctionCache/RepElems/$NUM_BKPTS ]; then
-    mkdir ~/MinimalFunctionCache/src/minimalFunctionCache/RepElems/$NUM_BKPTS
-  fi
+  mkdir ~/MinimalFunctionCache/src/minimalFunctionCache/RepElems/$NUM_BKPTS
   rm ~/MinimalFunctionCache/src/minimalFunctionCache/RepElems/$NUM_BKPTS/*.csv
   mv ~/MinimalFunctionCache/TEMP/RepElems/$NUM_BKPTS ~/MinimalFunctionCache/src/minimalFunctionCache/RepElems/$NUM_BKPTS
 fi
 
+rm -rf ~/MinimalFunctionCache/TEMP
     
