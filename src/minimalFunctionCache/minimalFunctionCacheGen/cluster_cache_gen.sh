@@ -24,7 +24,7 @@ chmod +x ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen
 # sbatch --partition=$PARTITION --account=$CLUSTER_ACCOUNT --ntasks=1 --cpus-per-task=1 --time=$  apptainer run cgf.sif python3 ~/MinimalFunctionCache/MinimalFunctionCacheGen/cache_job_setup.py $NUM_BKPT $SAMPLE_SIZE $TIME_PER_BATCH $MAX_NUM_ROW $MAX_STD $BACKEND $OVERHEAD_TIME_PER_BATCH $RUN_COMPUATION
 sbatch --partition=$PARTITION --ntasks=1 --cpus-per-task=1 --time=$INITAL_TIME:00  ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/setup_cache_run.sh
 
-echo ls ~/MinimalFunctionCache/TEMP
+ls ~/MinimalFunctionCache/TEMP
 # Now load job info
 source ~/MinimalFunctionCache/TEMP/temp_job_info.sh
 
