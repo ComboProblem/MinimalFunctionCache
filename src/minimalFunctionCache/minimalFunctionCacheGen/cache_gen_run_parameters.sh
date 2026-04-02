@@ -6,7 +6,7 @@ export PARTITION=high
 export MEM=4gb
 export INITAL_TIME=120
 # Set cache computation parameters
-export NUM_BKPT=4
+export NUM_BKPT=5
 export SAVE_BKPTS=true
 export SAVE_REP_ELEMS=true
 export SUBMIT_TO_GITHUB=true
