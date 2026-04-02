@@ -10,6 +10,7 @@ From: ubuntu:24.04
     python3 -m venv /cgf-venv/venv
     source /cgf-venv/venv/bin/activate
     pip install ".[passagemath]"
+    pip install pplitepy
 
 %environment
    source /cgf-venv/venv/bin/activate
