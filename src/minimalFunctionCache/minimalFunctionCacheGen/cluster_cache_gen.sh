@@ -61,6 +61,7 @@ if [ $SAVE_REP_ELEMS ]; then
   else
     rm ~/MinimalFunctionCache/src/minimalFunctionCache/RepElems/$NUM_BKPT/*.csv
   fi
+  ls ~/MinimalFunctionCache/TEMP/RepElems/$NUM_BKPT 
   mv ~/MinimalFunctionCache/TEMP/RepElems/$NUM_BKPT ~/MinimalFunctionCache/src/minimalFunctionCache/RepElems/$NUM_BKPT
   ls ~/MinimalFunctionCache/src/minimalFunctionCache/RepElems/$NUM_BKPT
 fi
