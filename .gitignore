@@ -4,3 +4,5 @@ build/
 MinimalFunctionCache.egg-info/
 # Ignore slurm output files
 *.out
+# Ignore sif images
+*.sif
