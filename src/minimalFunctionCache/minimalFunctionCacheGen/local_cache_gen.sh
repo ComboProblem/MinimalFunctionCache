@@ -26,7 +26,7 @@ fi
 # Run the inital set up.
 # chmod +x ~/setup_cache_run.sh
 # sbatch --partition=$PARTITION --account=$CLUSTER_ACCOUNT --ntasks=1 --cpus-per-task=1 --time=$  apptainer run cgf.sif python3 ~/MinimalFunctionCache/MinimalFunctionCacheGen/cache_job_setup.py $NUM_BKPT $SAMPLE_SIZE $TIME_PER_BATCH $MAX_NUM_ROW $MAX_STD $BACKEND $OVERHEAD_TIME_PER_BATCH $RUN_COMPUATION
-sbatch --partition=low --ntasks=1 --cpus-per-task=1 --time=$  apptainer run cgf.sif python3 ~/MinimalFunctionCache/MinimalFunctionCacheGen/cache_job_setup.py $NUM_BKPT $SAMPLE_SIZE $TIME_PER_BATCH $MAX_NUM_ROW $MAX_STD $BACKEND $OVERHEAD_TIME_PER_BATCH $RUN_COMPUATION
+sbatch --partition=low --ntasks=1 --cpus-per-task=1 --time=$INITAL_TIME  apptainer run cgf.sif python3 ~/MinimalFunctionCache/MinimalFunctionCacheGen/cache_job_setup.py $NUM_BKPT $SAMPLE_SIZE $TIME_PER_BATCH $MAX_NUM_ROW $MAX_STD $BACKEND $OVERHEAD_TIME_PER_BATCH $RUN_COMPUATION
 
 # Now load job info
 source ~/MinimalFunctionCache/TEMP/temp_job_info.sh
@@ -51,4 +51,4 @@ mkdir ~/MinimalFunctionCache/TEMP/RepElems/$NUM_BKPT
 # fi
 chmod +x ~/job_function_runner.sh
 
-apptainer run cgf.sif python3 ~/MinimalFunctionCache/MinimalFunctionCacheGen/gen_rep_elems_for_cache_from_file.py
+sbatch --partition=$PARTION --account=$CLUSTER_ACCOUNT --ntasks=$ --time=apptainer run cgf.sif python3 ~/MinimalFunctionCache/MinimalFunctionCacheGen/gen_rep_elems_for_cache_from_file.py

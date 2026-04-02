@@ -3,20 +3,22 @@ From: ubuntu:24.04
 
 %post -c /bin/bash
     apt-get update -y
-    apt-get install -y pip git python3.12-full
+    apt-get install -y pip git gh python3.12-full
     apt-get clean
     git clone --branch MinFunStable https://github.com/ComboProblem/cutgeneratingfunctionology.git cutgeneratingfunctionology
     cd cutgeneratingfunctionology
-    python3 -m venv /cgf-venv/venv
-    source /cgf-venv/venv/bin/activate
+    python3 -m venv cgf-venv
+    source /cgf-venv/bin/activate
     pip install ".[passagemath]"
     cd ~/
     pip install pplitepy
     pip install pyscipopt
     pip install scipy
     git clone https://github.com/ComboProblem/MinimalFunctionCache.git
-    sage -sh -c "cd ~/MinimalFunctionCache; pip install .; exit"
+    cd ~/
+    cd MinimalFunctionCache
+    pip install .
     cd ~/
 
 %environment
-   source /cgf-venv/venv/bin/activate
+   source /cgf-venv/bin/activate

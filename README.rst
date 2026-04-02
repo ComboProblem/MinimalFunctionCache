@@ -53,7 +53,7 @@ Installation
     cd MinimalFunctionCache
     pip install .
 
-- (Optionally:) Install pplite::
+- Install pplite::
 
     pip install pplitepy
 
@@ -61,8 +61,8 @@ Installation
 
     cd ..
     sage
-    sage: from cutgenerationfunctionology.igp import PiMinConatiner
-    sage: MinFun_with_at_most_5_breakpoints = PiMinConatiner(5) # loaded with the function cache!
+    sage: from cutgenerationfunctionology.igp import PiMinContConatiner
+    sage: MinFun_with_at_most_5_breakpoints = PiMinContConatiner(5) # loaded with the function cache!
 
 License 
 ~~~~~~~

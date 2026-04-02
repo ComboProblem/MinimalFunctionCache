@@ -2,12 +2,15 @@
 
 #SLURM JOB INFORMATION
 # export CLUSTER_ACCOUNT=<account_name>
-# export PARTITION=<partition>
-
+export PARTITION=high
+export MEM=4gb
+export INITAL_TIME=120
 # Set cache computation parameters
-export NUM_BKPT=6
+export NUM_BKPT=2
 export SAVE_BKPTS=true
-# For estimating cput time.
+export SAVE_REP_ELEMS=true
+export SUBMIT_TO_GITHUB=true
+# For estimating cpu time.
 export SAMPLE_SIZE=10 # increasing sample size increases the inital run time which could lenghtly wiht current implementation.
 export TIME_PER_BATCH=60 # mesured in minutes
 export OVERHEAD_TIME_PER_BATCH=5 # in minutes

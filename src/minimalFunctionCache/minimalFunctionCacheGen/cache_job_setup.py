@@ -78,26 +78,25 @@ inital_gen_logger.info(f"Sample computation time averages {average_sample_time:.
 
 
 # check dim analysis here, it looks right.
-estimated_cpu_time = average_sample_time * num_bkpts_seqs
+estimated_cpu_time = average_sample_time * num_bkpts_seqs # in seconds
 inital_gen_logger.info(f"Total estimated cpu time is {estimated_cpu_time/60:.2f} minutes")
 inital_gen_logger.info("Finding output size in rows and number of batches ...")
 guess_number_of_batches = int((estimated_cpu_time / (time_per_batch * 60)))+1
 #print(f"We will use {number_of_batches} for computation.")
 number_of_rows =  int(num_bkpts_seqs/guess_number_of_batches)
 if number_of_rows > max_number_of_rows:
-    batch_time_less_than_estimated_computation_time = True
+    # batch_time_less_than_estimated_computation_time == True
     number_of_rows = max_number_of_rows
-else:
-    batch_time_less_than_estimated_computation_time = False
+# else:
+    # batch_time_less_than_estimated_computation_time == False
 number_of_batches = int(num_bkpts_seqs/number_of_rows) + 1
-# mkdir ~/MinimalFunctionCache/TEMP
 inital_gen_logger.info(f"Number of rows per bkpt file:  {number_of_rows}\nNumber of rows per min_fun_rep file: {number_of_rows*k} \nNumber of Batches: {number_of_batches}")
 inital_gen_logger.info("Inferring batch time estimate based on parameters")
 sample_std =  std(sample_space)
 if overhead_time*60 > sample_std * max_std:
     time_alloc = time_per_batch + overhead_time
 else:
-    time_alloc = time_per_batch + (num_rows*sample_std * max_std)/60
+    time_alloc = time_per_batch + (number_of_rows*sample_std * max_std)/60
 time_alloc = int(time_alloc+1)
 inital_gen_logger.info(f"Allocated time batch: {time_alloc} minutes.")
 inital_gen_logger.info(f"Allocating {time_alloc * number_of_batches:.2f} minutes of CPU time.")
