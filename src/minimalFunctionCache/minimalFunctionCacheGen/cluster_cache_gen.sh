@@ -45,16 +45,16 @@ sbatch --array=0-$NUM_JOBS --partition=$PARTITION --account=$CLUSTER_ACCOUNT --n
 
 if [ $SAVE_BKPTS ]; then
   echo "saving breakpoints"
-  mkdir ~/MinimalFunctionCache/src/minimalFunctionCache/Breakpoints/$NUM_BKPTS
-  rm ~/MinimalFunctionCache/src/minimalFunctionCache/Breakpoints/$NUM_BKPTS/*.csv
-  mv ~/MinimalFunctionCache/TEMP/Breakpoints/$NUM_BKPT  ~/MinimalFunctionCache/src/minimalFunctionCache/Breakpoints/$NUM_BKPTS
+  mkdir ~/MinimalFunctionCache/src/minimalFunctionCache/Breakpoints/$NUM_BKPT
+  rm ~/MinimalFunctionCache/src/minimalFunctionCache/Breakpoints/$NUM_BKPT/*.csv
+  mv ~/MinimalFunctionCache/TEMP/Breakpoints/$NUM_BKPT  ~/MinimalFunctionCache/src/minimalFunctionCache/Breakpoints/$NUM_BKPT
 fi
 
 if [ $SAVE_REP_ELEMS ]; then
   echo "saving repelems"
-  mkdir ~/MinimalFunctionCache/src/minimalFunctionCache/RepElems/$NUM_BKPTS
-  rm ~/MinimalFunctionCache/src/minimalFunctionCache/RepElems/$NUM_BKPTS/*.csv
-  mv ~/MinimalFunctionCache/TEMP/RepElems/$NUM_BKPTS ~/MinimalFunctionCache/src/minimalFunctionCache/RepElems/$NUM_BKPTS
+  mkdir ~/MinimalFunctionCache/src/minimalFunctionCache/RepElems/$NUM_BKPT
+  rm ~/MinimalFunctionCache/src/minimalFunctionCache/RepElems/$NUM_BKPT/*.csv
+  mv ~/MinimalFunctionCache/TEMP/RepElems/$NUM_BKPT ~/MinimalFunctionCache/src/minimalFunctionCache/RepElems/$NUM_BKPT
 fi
 
 rm -rf ~/MinimalFunctionCache/TEMP
