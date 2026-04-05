@@ -129,14 +129,14 @@ if run_computation is None:
             print(f"Please input either Y or N to continue or not.")
     # prompt user to set run_computation, if not already set
 
-
+job_info_name = "temp_job_info_for_{}.sh".format(k)
 if run_computation:
     # write breakpoints
     # enviroment vars are attached to process
     os.chdir(os.getenv("BKPTS_PATH"))
     bkpts.write_data(max_rows=max_number_of_rows)
     os.chdir(os.getenv("MFC_TEMP"))
-    with open("temp_job_info.sh", "w") as run_vars_file:
+    with open(job_info_name, "w") as run_vars_file:
         run_vars_file.write("#!/bin/bash\n")
         run_vars_file.write(f"export RUN_COMPUTATION=1\n")
         run_vars_file.write(f"export NUM_ROWS={number_of_rows}\n")
@@ -150,7 +150,7 @@ if run_computation:
     # os.putenv("ALLOC_TIME_PER_JOB", str(time_alloc))
 else:
     os.chdir(os.getenv("MFC_TEMP"))
-    with open("temp_job_info.sh", "w") as run_vars_file:
+    with open(job_info_name, "w") as run_vars_file:
         run_vars_file.write("#!/bin/bash\n")
         run_vars_file.write(f"export RUN_COMPUTATION=0")
 os.exit()
