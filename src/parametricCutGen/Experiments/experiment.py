@@ -1,7 +1,9 @@
 import tomllib
 import logging
+import os
 from pyscipopt import Model
-from cutGen.optimal_cut_generation import OptimalCut
+from parametricCutGen.optimal_cut_generation import OptimalCut
+
 
 
 test_model = Model()
@@ -20,8 +22,24 @@ def cutGenProb_parameter_parser(path_to_cutGenProb_config_toml, configured_cutGe
     """
     pass
     
+class Experiement:
+    """
+    Parametrically defined experiments. 
+    
+    Parameters: Algorithm
+    If ne
+    """
+    
+    def __init__(**parameters):
+        """
+        Checks the experiemental 
+        """
+    def run_experiment():
+        experiment_model = Model()
+        
+    def write_results():
+        pass
 
+    def get_logs():
+        pass
 
-# parse experimental setting
-
-# create jobs by sending job to runner

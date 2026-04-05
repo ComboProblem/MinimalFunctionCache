@@ -18,7 +18,7 @@ mkdir $MFC_TARGET/RepElems/$NUM_BKPT
 
 # load module(s)
 # module purge
-echo "Checking for APPTAINER."
+echo "Checking for apptainer."
 module load apptainer
 if [ ! -f cgf.sif ]; then
   echo ""

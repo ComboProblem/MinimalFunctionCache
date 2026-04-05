@@ -12,17 +12,16 @@ export SAVE_BKPTS=true  # bash bool
 export SAVE_REP_ELEMS=true # bash bool
 export SUBMIT_TO_GITHUB=true # bash bool
 # For estimating cpu time.
-export SAMPLE_SIZE=10 # increasing sample size increases the inital run time which could lenghtly wiht current implementation.
-export TIME_PER_BATCH=60 # mesured in minutes
+export SAMPLE_SIZE=10 # increasing sample size increases the initial run time which could long with current implementation.
+export TIME_PER_BATCH=60 # measured in minutes
 export OVERHEAD_TIME_PER_BATCH=5 # in minutes
 export MAX_STD=5 # used in time estimages
 export MAX_NUM_ROW=1000 # in each breakpoint file.
 export BACKEND="pplite" #pplite or None
 export OVERHEAD_TIME=5 # in minutes
 export LOGGING_LEVEL="" #debug, warning, or error, anything else will default to info
-#
-export RUN_COMPUTAION=yes # after breakpoint computaiton disbatch to the cluster
-
+# Default Run Option
+export RUN_COMPUTAION=yes # after breakpoints computation dispatch to the cluster
 # Locations of paths
 export MFC_TEMP="~/MinimalFunctionCache/TEMP"
 export MFC_TARGET="~/MinimalFunctionCache/src/minimalFunctionCache"
