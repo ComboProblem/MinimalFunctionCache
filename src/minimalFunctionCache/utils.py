@@ -30,7 +30,7 @@ def minimal_function_cache_info():
 
 def minimal_function_cache_loader(n, breakpoints_or_rep_elems, prototype=QQ):
     """
-    Loads minimal function cache elements as a list with each repereseative element values having the type of prototype, by default, QQ
+    Loads minimal function cache elements as a list with each repereseative element values having the type of prototype, by default, QQ.
 
     Prototype is a callable that that takes on input a string with format "a/b" where a and b are integers.
     Prototype can return anything.
@@ -75,7 +75,9 @@ def minimal_function_cache_loader(n, breakpoints_or_rep_elems, prototype=QQ):
             with open(file, newline='') as csvfile:
                 file_reader = csv.reader(csvfile)
                 for row in file_reader:
-                    bkpts.append([prototype(data) for data in row])
+                    bkpt = [QQ(data) for data in row[0].strip("[]").split(",")]
+                    val = [QQ(data) for data in row[1].strip("[]").split(",")]
+                    rep_elems.append((bkpt, val))
         return rep_elems
     else:
         raise ValueError("A cache has not been loaded, check spelling and inputs.")
