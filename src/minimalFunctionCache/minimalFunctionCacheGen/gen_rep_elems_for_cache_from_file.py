@@ -11,7 +11,7 @@ input_file_name = f"bkpts_of_len_{k}_part_{job_number}.csv"
 os.chdir(os.getenv("BKPTS_PATH"))
 try:
     rep_elm_gen_logger.info(f"Starting computations for job {job_number}.")
-    PiMin_worker = PiMinContContainer(k, manually_load_function_cache=True, path_to_file_or_file_name_in_cwd=input_file_name, breakpoints_or_rep_elems="breakpoints")
+    PiMin_worker = PiMinContContainer(k, manually_load_function_cache=True, file_or_folder="file", path_to_file_or_folder=input_file_name, breakpoints_or_rep_elems="breakpoints")
     rep_elm_gen_logger.info(f"Computations from {job_number} has finished. Writing data.")
 except FileNotFoundError:
     rep_elm_gen_logger.warning(f"{input_file_name} not found in {os.getenv("BKPTS_PATH")}")
