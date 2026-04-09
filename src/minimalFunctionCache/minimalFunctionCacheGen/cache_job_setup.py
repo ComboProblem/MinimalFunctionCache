@@ -62,7 +62,7 @@ def validate_paths(run_params):
     """
     Read path environment variables and check existence. 
     """
-    paths = {"bkpts_path_base":os.getenv("BKPTS_PATH_BASE"), "rep_elem_path": os.getenv("REP_ELEM_PATH_BASE"), "temp":os.getenv("MFC_TEMP")}
+    paths = {"bkpts_path_base":os.getenv("BKPTS_PATH_BASE"), "rep_elem_path_base": os.getenv("REP_ELEM_PATH_BASE"), "temp":os.getenv("MFC_TEMP")}
     paths["bkpt_current_path"] = os.path.join(paths["bkpts_path_base"], str(run_params['k']))
     paths["bkpt_prev_path"] = os.path.join(paths["bkpts_path_base"], str(run_params['k']-1))
     parths_are_valid = True
@@ -99,7 +99,6 @@ def estimate_time(run_params, bkpts):
     Estimates the total time based on bkpts and run parameters. 
     """
     assert(run_params['sample_size'] < bkpts.num_rep_elems())
-    # bkpts.write_data(max_rows=max_lines_in_file)
     # Estimate cpu time per computation per breakpoint
     initial_gen_logger.info(f"Number of breakpoints sequences: {bkpts.num_rep_elems()}.\n Determining run time estimate.")
     sample_space = sample(list(bkpts.get_rep_elems()), run_params['sample_size'])

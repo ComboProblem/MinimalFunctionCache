@@ -1,5 +1,7 @@
 #!/bin/bash -x
 
+export K="$1"
+
 echo "Running on $(hostname)"
 echo "Task: $SLURM_ARRAY_TASK_ID"
 source ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/cache_gen_run_parameters.sh
