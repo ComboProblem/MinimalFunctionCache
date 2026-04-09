@@ -82,17 +82,17 @@ def gen_bkpts(paths, run_params):
     """
     Tries to use the provided specific previous breakpoints path to generate the current jobs breakpoints.
     """
-    initial_gen_logger.debug("Number of files in {}\n {}".format(paths["bkpt_prev_path"], len(os.listdir(paths["bkpt_prev_path"]))))
-    if len(os.listdir(paths["bkpt_prev_path"])) > 0:
-        bkpts = BreakpointComplexClassContainer(run_params['k'], backend=run_params['which_backend'], manually_load_breakpoint_cache=True, folder_or_file="folder", path_to_file_or_folder=paths["bkpt_prev_path"])
-        initial_gen_logger.debug("Loading previous breakpoints from {}".format(paths["bkpt_prev_path"]))
+    if os.path.exists(paths["bkpt_prev_path"]):
+        initial_gen_logger.debug("Number of files in {}\n {}".format(paths["bkpt_prev_path"], len(os.listdir(paths["bkpt_prev_path"]))))
+        if len(os.listdir(paths["bkpt_prev_path"])) > 0:
+            bkpts = BreakpointComplexClassContainer(run_params['k'], backend=run_params['which_backend'], manually_load_breakpoint_cache=True, folder_or_file="folder", path_to_file_or_folder=paths["bkpt_prev_path"])
+            initial_gen_logger.debug("Loading previous breakpoints from {}".format(paths["bkpt_prev_path"]))
     else:
-        initial_gen_logger.debug("Path {} contains no files. Generating without previous information.".format(paths["bkpt_prev_path"]))
+        initial_gen_logger.debug("Path {} contains no files or does not exist. Generating without previous information.".format(paths["bkpt_prev_path"]))
         bkpts = BreakpointComplexClassContainer(run_params['k'], backend=run_params['which_backend'])
 #    except FileNotFoundError:
 #        initial_gen_logger.debug("Path {} does not exist. Generating without previous information.".format(paths["bkpt_prev_path"]))
 #        bkpts = BreakpointComplexClassContainer(run_params['k'], backend=run_params['which_backend'])
-    initial_gen_logger.debug("{bkpts}")
     return bkpts
 
 def estimate_time(run_params, bkpts):

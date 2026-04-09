@@ -19,16 +19,22 @@ Included Software and Tools
 Goals and Non-Goals
 ~~~~~~~~~~~~~~~~~~~
 
- - Illustrate concept of explicit optimal cut selection. 
+ - Illustrate concept of explicit optimal cut selection.
+
  - Reproducible on local and HPC machines.
+
  - Mathematical correctness of cut generation.
+
  - Interface with current optimization software ``pyscipopt``.
+
  - Demonstrate use of ``passsagemath`` in application.
    
 Non-goals
 ~~~~~~~~~
+
  - Performance and code optimization; the cut generation technique presented is a proof of concept and is intended to function (for practical problem) with an excess of compute.
- - Documentation light, code follows thesis. 
+
+ - Documentation light. 
 
 Installation
 ~~~~~~~~~~~~
