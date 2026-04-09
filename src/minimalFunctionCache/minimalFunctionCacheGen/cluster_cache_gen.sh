@@ -47,9 +47,9 @@ fi
 setup_apptainer(){
 echo "Checking for apptainer."
 module load apptainervl
-if [ ! -f $MFC_TARGET/cgf.sif ]; then
+if [ ! -f "$MFC_TARGET/cgf.sif" ]; then
   echo "Building apptainer"
-  apptainer build $MFC_TARGET/cgf.sif $APPTAINER_DEF_PATH
+  apptainer build "$MFC_TARGET/cgf.sif" "$APPTAINER_DEF_PATH"
 fi
 }
 
