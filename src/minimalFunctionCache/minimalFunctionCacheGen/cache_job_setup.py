@@ -159,7 +159,7 @@ def interactive_run(run_params):
 def create_job(paths, run_params, batch_info):
     job_info_name = "temp_job_info_for_{}.sh".format(run_params['k'])
     cwd = os.getcwd()
-    if run_computation:
+    if run_params['run_computation']:
         os.chdir(paths["bkpt_current_path"])
         bkpts.write_data(max_rows=max_number_of_rows)
         os.chdir(cwd)

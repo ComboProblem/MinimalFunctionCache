@@ -11,7 +11,7 @@ declare -i NUM_BKPT_UPPER_BOUND=4
 export SAVE_REP_ELEMS=true # bash bool
 export SUBMIT_TO_GITHUB=true # bash bool
 # For estimating cpu time.
-export SAMPLE_SIZE=10 # increasing sample size increases the initial run time which could long with current implementation.
+export SAMPLE_SIZE=2 # increasing sample size increases the initial run time which could long with current implementation.
 export TIME_PER_BATCH=60 # measured in minutes
 export OVERHEAD_TIME_PER_BATCH=5 # in minutes
 export MAX_STD=5 # used in time estimates
