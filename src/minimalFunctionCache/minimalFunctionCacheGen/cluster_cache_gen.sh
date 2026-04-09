@@ -56,6 +56,7 @@ fi
 main(){
 
 get_parameters_and_load_temp
+echo "$NUM_BKPT_LOWER_BOUND,  $NUM_BKPT_UPPER_BOUND"
 
 for ((NUM_BKPT = $NUM_BKPT_LOWER_BOUND; NUM_BKPT <= $NUM_BKPT_UPPER_BOUND; NUM_BKPT++))
 do
