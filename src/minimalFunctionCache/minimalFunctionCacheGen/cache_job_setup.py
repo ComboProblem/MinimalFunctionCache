@@ -156,7 +156,7 @@ def interactive_run(run_params):
                 print(f"Please input either Y or N to continue or not.")
     return run_params
 # Write a results files that bash will read. 
-def create_job(paths, run_params, batch_info):
+def create_job(batch_info, bkpts, paths, run_params):
     job_info_name = "temp_job_info_for_{}.sh".format(run_params['k'])
     cwd = os.getcwd()
     if run_params['run_computation']:
@@ -187,7 +187,7 @@ def __main__():
     initial_gen_logger.debug("Checking interactive run.")
     run_params = interactive_run(run_params)
     initial_gen_logger.info("Writing Job Parameters...")
-    create_job(paths, run_params, batch_info)
+    create_job(batch_info, bkpts, paths, run_params)
     initial_gen_logger.info("Finished.")
 
 __main__()
