@@ -161,7 +161,7 @@ def create_job(paths, run_params, batch_info):
     cwd = os.getcwd()
     if run_params['run_computation']:
         os.chdir(paths["bkpt_current_path"])
-        bkpts.write_data(max_rows=max_number_of_rows)
+        bkpts.write_data(max_rows=run_params['max_number_of_rows'])
         os.chdir(cwd)
         os.chdir(paths["temp"])
         with open(job_info_name, "w") as run_vars_file:
