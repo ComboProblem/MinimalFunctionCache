@@ -10,12 +10,12 @@ mkdir $MFC_TEMP
 }
 
 setup_file_system () {
-if [ ! -d "$BKPT_PATH_BASE/$NUM_BKPT" ];
+if [ ! -d "$BKPT_PATH_BASE/$NUM_BKPT" ]; then
     mkdir -p $BKPT_PATH_BASE/$NUM_BKPT
 else
     echo "path: $BKPT_PATH_BASE/$NUM_BKPT exists; proceed with caution."
 fi
-if [ ! -d "$REP_ELEM_PATH_BASE/$NUM_BKPT" ];
+if [ ! -d "$REP_ELEM_PATH_BASE/$NUM_BKPT" ]; then
     mkdir -p $REP_ELEM_PATH_BASE/$NUM_BKPT
 else
     echo "path: $REP_ELEM_PATH_BASE/$NUM_BKPT exists; proceed with caution."
@@ -25,7 +25,7 @@ fi
 setup_cache_run(){
 echo "Running inital setup."
 chmod +x ./MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/setup_cache_run.sh
-if [ ]; then 
+if [ $FLAGS == *c* ]; then 
 $sbatch --partition=$PARTITION --account=$CLUSTER_ACCOUNT --ntasks=1 --cpus-per-task=1 --time=$INITAL_TIME:00  ./MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/setup_cache_run.sh $NUM_BKPT
 else
  ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/setup_cache_run.sh $NUM_BKPT
@@ -60,7 +60,7 @@ get_parameters_and_load_temp()
 for ((NUM_BKPT = $NUM_BKPT_LOWER_BOUND; NUM_BKPT <= $NUM_BKPT_UPPER_BOUND; NUM_BKPT++))
 do
 echo "Starting run for $NUM_BKPT."
-# Set up file system; should add some logic to 
+
 setup_file_system () 
 
 setup_apptainer()
