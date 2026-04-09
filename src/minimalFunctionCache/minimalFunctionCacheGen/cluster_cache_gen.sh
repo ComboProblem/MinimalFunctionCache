@@ -25,7 +25,7 @@ fi
 setup_cache_run(){
 echo "Running inital setup."
 chmod +x ./MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/setup_cache_run.sh
-if [ $FLAGS == *c* ]; then 
+if [ "$FLAGS" == *c* ]; then 
 $sbatch --partition=$PARTITION --account=$CLUSTER_ACCOUNT --ntasks=1 --cpus-per-task=1 --time=$INITAL_TIME:00  ./MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/setup_cache_run.sh $NUM_BKPT
 else
  ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/setup_cache_run.sh $NUM_BKPT
@@ -46,7 +46,7 @@ fi
 
 setup_apptainer(){
 echo "Checking for apptainer."
-module load apptainervl
+module load apptainer
 if [ ! -f "$MFC_TARGET/cgf.sif" ]; then
   echo "Building apptainer"
   apptainer build "$MFC_TARGET/cgf.sif" "$APPTAINER_DEF_PATH"
