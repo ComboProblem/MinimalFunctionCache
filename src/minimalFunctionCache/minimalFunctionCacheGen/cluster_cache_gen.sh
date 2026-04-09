@@ -26,7 +26,7 @@ setup_cache_run(){
 echo "Running inital setup."
 chmod +x ./MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/setup_cache_run.sh
 if [ "$FLAGS" == *c* ]; then 
-$sbatch --partition=$PARTITION --account=$CLUSTER_ACCOUNT --ntasks=1 --cpus-per-task=1 --time=$INITAL_TIME:00  ./MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/setup_cache_run.sh $NUM_BKPT
+sbatch --partition=$PARTITION --account=$CLUSTER_ACCOUNT --ntasks=1 --cpus-per-task=1 --time=$INITAL_TIME:00  ./MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/setup_cache_run.sh $NUM_BKPT
 else
  ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/setup_cache_run.sh $NUM_BKPT
 fi
@@ -55,17 +55,17 @@ fi
 
 main(){
 
-get_parameters_and_load_temp()
+get_parameters_and_load_temp
 
 for ((NUM_BKPT = $NUM_BKPT_LOWER_BOUND; NUM_BKPT <= $NUM_BKPT_UPPER_BOUND; NUM_BKPT++))
 do
 echo "Starting run for $NUM_BKPT."
 
-setup_file_system() 
+setup_file_system
 
-setup_apptainer()
+setup_apptainer
 
-setup_cache_run()
+setup_cache_run
 
 echo "Run setup complete $NUM_BKPT. Dispatching jobs."
 chmod +x ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/job_function_runner.sh
