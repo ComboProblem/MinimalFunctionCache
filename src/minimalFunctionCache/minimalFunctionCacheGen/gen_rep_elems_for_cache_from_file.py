@@ -48,7 +48,7 @@ def dispatch_worker(job_params, paths):
         PiMin_worker = PiMinContContainer(k, manually_load_function_cache=True, folder_or_file="file", path_to_file_or_folder=os.path.join(paths["bkpt_path"], job_params["input_file_name"]), breakpoints_or_rep_elems="breakpoints")
         rep_elm_gen_logger.info(f"Computations from {job_number} has finished. Writing data.")
     except FileNotFoundError:
-        rep_elm_gen_logger.warning(f"{} not found in {}".format(input_file_name, paths["bkpt_path"]))
+        rep_elm_gen_logger.warning("{} not found in {}".format(input_file_name, paths["bkpt_path"]))
     output_file_name = f"Pi_Min_{k}_part_{job_number}"
     os.chdir(paths["rep_elem_path"])
     PiMin_worker.write_data(output_file_name)
