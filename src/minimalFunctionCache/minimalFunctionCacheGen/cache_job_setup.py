@@ -7,22 +7,24 @@ from random import sample
 import logging
 
 # set up logger
-inital_gen_logger = logging.getLogger(__name__)
+initial_gen_logger = logging.getLogger(__name__)
 logging_level = os.getenv("LOGGING_LEVEL")
 if logging_level == "debug":
-    inital_gen_logger.info(f"Adjusting the default logging level to DEBUG")
-    inital_gen_logger.setLevel(logging.DEBUG)
+    initial_gen_logger.info(f"Adjusting the default logging level to DEBUG")
+    initial_gen_logger.setLevel(logging.DEBUG)
 elif logging_level == "warning":
-    inital_gen_logger.info(f"Adjusting the default logging level to WARNING")
-    inital_gen_logger.setLevel(logging.WARNING)
+    initial_gen_logger.info(f"Adjusting the default logging level to WARNING")
+    initial_gen_logger.setLevel(logging.WARNING)
 elif logging_level == "error":
-    inital_gen_logger.info(f"Adjusting the default logging level to ERROR")
-    inital_gen_logger.setLevel(logging.ERROR)
+    initial_gen_logger.info(f"Adjusting the default logging level to ERROR")
+    initial_gen_logger.setLevel(logging.ERROR)
 else:
-    inital_gen_logger.setLevel(logging.INFO)
+    initial_gen_logger.setLevel(logging.INFO)
 # read parameters from cache_gen_run_parameters.sh and setup_cache_run.sh
 def read_non_path_parameters():
-    inital_gen_logger.info("Reading non path parameters....")
+    """
+    Read and validate non path parameters from cache_gen_run_parameters.sh and setup_cache_run.sh.
+    """
     k = int(os.getenv("K")) # for now keep k small, <= 9 from initial testing.
     assert(k >= 2)
     sample_size = int(os.getenv("SAMPLE_SIZE"))# pick a value between 2 and NUM_BKPTS
@@ -45,118 +47,146 @@ def read_non_path_parameters():
     if run_computation_default is not None:
         if run_computation_default.lower().strip(" ") == "n" or run_computation_default.lower().strip(" ") == "no":
             run_computation = False
-            inital_gen_logger.info("The full computation will not run.")
         elif run_computation_default.lower().strip(" ") == "y" or run_computation_default.lower().strip(" ") == "yes":
             run_computation = True
-            inital_gen_logger.info("The full computation will run after inferring job parameters.")
         else:
-            inital_gen_logger.info("No valid argument for default choice to run full computation or not. Will ask again later.")
             run_computation = None # signal to program to wait for user input.
     else:
         run_computation = None
-        inital_gen_logger.info("Will ask about running full computation later.")
-    params = {"k":k, "sample_size":sample_size, "time_per_batch":time_per_batch, "max_number_of_rows":max_number_of_rows, "max_std":max_std, "which_backend":which_backend, "overhead_time":overhead_time, "run_computation_default":run_computation_default}
-    logging.debug({"k":k, "sample_size":sample_size, "time_per_batch":time_per_batch, "max_number_of_rows":max_number_of_rows, "max_std":max_std, "which_backend":which_backend, "overhead_time":overhead_time, "run_computation_default":run_computation_default})
-    return params
+    run_params = {"k":k, "sample_size":sample_size, "time_per_batch":time_per_batch, "max_number_of_rows":max_number_of_rows, "max_std":max_std, "which_backend":which_backend, "overhead_time":overhead_time, "run_computation_default":run_computation_default}
+    logging.debug(f"Read Parameters: {run_params}")
+    return run_params
 
-
-def read_paths():
-    pass
+def validate_paths(run_params):
+    """
+    Read path environment variables and check existence. 
+    """
+    paths = {"bkpts_path_base":os.getenv("BKPTS_PATH_BASE"), "rep_elem_path": os.genenv("REP_ELEM_PATH_BASE"), "temp":os.getenv("MFC_TEMP")}
+    paths["bkpt_current_path"] = os.path.join(paths["bkpts_path_base"], str(run_params['k']))
+    paths["bkpt_prev_path"] = os.path.join(paths["bkpts_path_base"], str(run_params['k']-1))
+    parths_are_valid = True
+    bad_paths = {}
+    for path in paths:
+        if os.path.exists(paths[path]):
+            initial_gen_logger.debug(f"Path {path} with dir {paths[path]} exists")
+        else:
+            initial_gen_logger.debug(f"Path {path} with dir {paths[path]} does not exists")
+            parths_are_valid = False
+            bad_paths[path] = paths[path]
+    if parths_are_valid is False:
+        initial_gen_logger.warning(f"Some invalid path(s) provided. Listing: {bad_paths}")
+    return paths
     
+def gen_bkpts(paths, run_params):
+    """
+    Tries to use the provided specific previous breakpoints path to generate the current jobs breakpoints.
+    """
+    try:
+        if len(os.listdir(paths["prev_bkpts_path"])) > 0:
+            bkpts = BreakpointComplexClassContainer(run_params['k'], backend=run_params['which_backend'], manually_load_breakpoint_cache=True, file_or_foler="folder", path_to_file_or_foler=paths["prev_bkpts_path"])
+            initial_gen_logger.debug(f"Loading previous breakpoints from {}".format(paths["prev_bkpts_path"])
+        else:    
+            initial_gen_logger.debug(f"Path {} contains no files. Generating without previous information.".format(paths["prev_bkpts_path"]")
+            bkpts = BreakpointComplexClassContainer(run_params['k'], backend=run_params['which_backend'])
+    except FileNotFoundError:
+        initial_gen_logger.debug(f"Path {} does not exist. Generating without previous information.".format(paths["prev_bkpts_path"])
+        bkpts = BreakpointComplexClassContainer(run_params['k'], backend=run_params['which_backend'])
+    return bkpts
 
-
-
-
-
-prev_bkpt_path = "~/MinimalFunctionCache/src/minimalFuncitonCache/Breakpoints/"+str(k-1)
-def gen_bkpts():
-    pass
-try:
-    inital_gen_logger.debug(f"{prev_bkpt_path} exists {os.path.exists(prev_bkpt_path)}")
-    if len(os.listdir(prev_bkpt_path)) > 0:
-        bkpts = BreakpointComplexClassContainer(k, backend=which_backend, manually_load_breakpoint_cache=True, file_or_foler="folder", path_to_file_or_foler=prev_bkpt_path)
-        inital_gen_logger.debug(f"Loading previuos breakpoints from {prev_bkpt_path}")
-    else:
-        inital_gen_logger.debug(f"Path {prev_bkpt_path} contains no files. Generating breakpoints without prior infromation.")
-        bkpts = BreakpointComplexClassContainer(k, backend=which_backend)
-except FileNotFoundError:
-    inital_gen_logger.debug(f"Path {prev_bkpt_path} does not exist. Generating breakpoints without prior infromation.")
-    bkpts = BreakpointComplexClassContainer(k, backend=which_backend)
-
-def estimate_time():
-
-    assert(sample_size < bkpts.num_rep_elems())
+def estimate_time(run_params, bkpts):
+    """
+    Estimates the total time based on bkpts and run parameters. 
+    """
+    assert(run_params['sample_size'] < bkpts.num_rep_elems())
     # bkpts.write_data(max_rows=max_lines_in_file)
     # Estimate cpu time per computation per breakpoint
-    inital_gen_logger.info(f"Number of breakpoints sequences: {bkpts.num_rep_elems()}.\nDetermining run time estimate.")
-    sample_space = sample(list(bkpts.get_rep_elems()), k = sample_size)
-    inital_gen_logger.info("Sample space found; computing sample points...")
+    initial_gen_logger.info(f"Number of breakpoints sequences: {bkpts.num_rep_elems()}.\n Determining run time estimate.")
+    sample_space = sample(list(bkpts.get_rep_elems()), run_params['k'] = run_params['sample_size'])
+    initial_gen_logger.info("Sample space found; computing sample points...")
     # use real time estimations
     start = time.time()
-    find_minimal_function_reps_from_bkpts(sample_space, backend=which_backend)
+    find_minimal_function_reps_from_bkpts(sample_space, backend=run_params['which_backend'])
     end = time.time()
     average_sample_time = (end - start) / sample_size
-    inital_gen_logger.info(f"Sample computation time averages {average_sample_time:.2f} second per breakpoint sequence.")
+    initial_gen_logger.info(f"Sample computation time averages {average_sample_time:.2f} second per breakpoint sequence.")
     # find time to be used per batch.
     # Infer a reasonable time estimate based on user specifications and measured data.
     estimated_cpu_time = average_sample_time * bkpts.num_rep_elems() # total timein seconds
-    inital_gen_logger.info(f"Total estimated cpu time is {estimated_cpu_time/60:.2f} minutes")
-    inital_gen_logger.info("Finding output size in rows and number of batches ...")
-    guess_number_of_batches = int((estimated_cpu_time / (time_per_batch * 60)))+1
-    number_of_rows =  int(bkpts.num_rep_elems()/guess_number_of_batches)
-    if number_of_rows > max_number_of_rows:
+    initial_gen_logger.info(f"Total estimated cpu time is {estimated_cpu_time/60:.2f} minutes")
+    initial_gen_logger.info("Finding output size in rows and number of batches ...")
+    guess_number_of_batches = int((estimated_cpu_time / (run_params['time_per_batch'] * 60)))+1
+    number_of_rows =  int(bkpts.num_rep_elems() / guess_number_of_batches)
+    if number_of_rows > run_params['max_number_of_rows']:
         # batch_time_less_than_estimated_computation_time == True
-        number_of_rows = max_number_of_rows
+        number_of_rows = run_params['max_number_of_rows']
     # else:
         # batch_time_less_than_estimated_computation_time == False
     number_of_batches = int(bkpts.num_rep_elems()/number_of_rows) + 1
-    inital_gen_logger.info(f"Number of rows per bkpt file:  {number_of_rows}\nNumber of rows per min_fun_rep file: {number_of_rows*k} \nNumber of Batches: {number_of_batches}")
-    inital_gen_logger.info("Inferring batch time estimate based on parameters")
+    initial_gen_logger.info(f"Number of rows per bkpt file:  {number_of_rows}\nNumber of rows per min_fun_rep file: {number_of_rows * (run_params['k'] - 1)} \n Number of Batches: {number_of_batches}")
+    initial_gen_logger.info("Inferring batch time estimate based on parameters")
     sample_std =  std(sample_space)
+    initial_gen_logger.debug(f"Sample std: {sample_std}")
     if overhead_time*60 > sample_std * max_std:
-        time_alloc = time_per_batch + overhead_time
+        time_alloc = run_params['time_per_batch'] + run_params['overhead_time']
     else:
-        time_alloc = time_per_batch + (number_of_rows*sample_std * max_std)/60
+        time_alloc = run_params['time_per_batch'] + (number_of_rows*sample_std * run_params['max_std'])/60
     time_alloc = int(time_alloc+1)
-    inital_gen_logger.info(f"Allocated time batch: {time_alloc} minutes.")
-    inital_gen_logger.info(f"Allocating {time_alloc * number_of_batches:.2f} minutes of CPU time.")
+    initial_gen_logger.info(f"Allocated time batch: {time_alloc} minutes.")
+    initial_gen_logger.info(f"Allocating {time_alloc * number_of_batches:.2f} minutes of CPU time.")
+    batch_info = {}
+    initial_gen_logger.debug(f"Batch info: {batch_info}")
+    return batch_info
 # Interactive decisions to authorize the computation.
-# TODO: Make this read a bash var for a -i flag when running the script.
-if run_computation is None:
-    print(f"Do you want to continue to run the computation? Y or N?")
-    valid_input = False
-    while not valid_input:
-        cont = input()
-        if cont.lower().strip(' ') == "n":
-            run_computation = False
-            valid_input = True
-            print(f"Aborting run...")
-        elif cont.lower().strip(' ') == "y":
-            run_computation = True
-            valid_input = True
-            print(f"Run approved. Carrying on with computation.")
-        else:
-            print(f"Please input either Y or N to continue or not.")
+def interactive_run(run_params):
+    if run_params['run_computation'] is None:
+        print(f"Do you want to continue to run the computation? Y or N?")
+        valid_input = False
+        while not valid_input:
+            cont = input()
+            if cont.lower().strip(' ') == "n":
+                run_params['run_computation'] = False
+                valid_input = True
+                initial_gen_logger.info(f"Aborting run.")
+            elif cont.lower().strip(' ') == "y":
+                run_params['run_computation'] = True
+                valid_input = True
+                initial_gen_logger.info(f"Run approved. Carrying on with computation.")
+            else:
+                print(f"Please input either Y or N to continue or not.")
+    return run_params
 # Write a results files that bash will read. 
-job_info_name = "temp_job_info_for_{}.sh".format(k)
-cwd = os.getcwd()
-if run_computation:
-    os.chdir(os.getenv("BKPTS_PATH"))
-    bkpts.write_data(max_rows=max_number_of_rows)
-    os.chdir(cwd)
-    os.chdir(os.getenv("MFC_TEMP"))
-    with open(job_info_name, "w") as run_vars_file:
-        run_vars_file.write("#!/bin/bash\n")
-        run_vars_file.write(f"export RUN_COMPUTATION=1\n")
-        run_vars_file.write(f"export NUM_ROWS={number_of_rows}\n")
-        run_vars_file.write(f"export NUM_JOBS={number_of_batches}\n")
-        run_vars_file.write(f"export ALLOC_TIME_PER_JOB={time_alloc}")
-else:
-    os.chdir(os.getenv("MFC_TEMP"))
-    with open(job_info_name, "w") as run_vars_file:
-        run_vars_file.write("#!/bin/bash\n")
-        run_vars_file.write(f"export RUN_COMPUTATION=0")
+def create_job(paths, run_params, batch_info):
+    job_info_name = "temp_job_info_for_{}.sh".format(run_params['k'])
+    cwd = os.getcwd()
+    if run_computation:
+        os.chdir(paths["bkpt_current_path"])
+        bkpts.write_data(max_rows=max_number_of_rows)
+        os.chdir(cwd)
+        os.chdir(paths["temp"])
+        with open(job_info_name, "w") as run_vars_file:
+            run_vars_file.write("#!/bin/bash\n")
+            run_vars_file.write(f"export RUN_COMPUTATION=1\n")
+            run_vars_file.write(f"export NUM_ROWS={batch_info['number_of_rows']}\n")
+            run_vars_file.write(f"export NUM_JOBS={batch_info['number_of_batches']}\n")
+            run_vars_file.write(f"export ALLOC_TIME_PER_JOB={batch_info['time_alloc']}")
+    else:
+        os.chdir(paths["temp"])
+        with open(job_info_name, "w") as run_vars_file:
+            run_vars_file.write("#!/bin/bash\n")
+            run_vars_file.write(f"export RUN_COMPUTATION=0")
 
 def __main__():
-    read_non_path_parameters()
-    inital_gen_logger.info("Computing breakpoints...")
+    initial_gen_logger.info("Reading Parameters and validating paths")
+    run_params = read_non_path_parameters()
+    paths = validate_paths(run_params)
+    initial_gen_logger.info("Computing breakpoints...")
+    bkpts = gen_bkpts(paths, run_params) 
+    initial_gen_logger.info("Estimating batch information")
+    batch_info = estimate_time(run_params, bkpts)
+    initial_gen_logger.debug("Checking interactive run.")
+    run_params = interactive_run(run_params)
+    initial_gen_logger.info("Writing Job Parameters...")
+    create_job(paths, run_params, batch_info)
+    initial_gen_logger.info("Finished.")
+
+__main__()
