@@ -57,3 +57,5 @@ def __main__():
     job_params = set_up_job_params()
     paths = setup_and_validate_paths()
     dispatch_worker(job_params, paths)
+
+__main__()
