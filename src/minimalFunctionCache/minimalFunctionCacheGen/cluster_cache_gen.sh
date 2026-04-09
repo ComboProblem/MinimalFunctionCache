@@ -4,7 +4,7 @@
 export FLAGS="$1"
 
 get_parameters_and_load_temp(){
-source ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/cache_gen_run_parameters.sh
+source ./MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/cache_gen_run_parameters.sh
 echo "Parameters loaded; running cache generation."
 mkdir $MFC_TEMP
 }

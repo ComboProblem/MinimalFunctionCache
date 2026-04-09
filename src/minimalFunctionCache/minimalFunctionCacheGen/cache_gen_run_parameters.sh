@@ -14,7 +14,7 @@ export SUBMIT_TO_GITHUB=true # bash bool
 export SAMPLE_SIZE=10 # increasing sample size increases the initial run time which could long with current implementation.
 export TIME_PER_BATCH=60 # measured in minutes
 export OVERHEAD_TIME_PER_BATCH=5 # in minutes
-export MAX_STD=5 # used in time estimages
+export MAX_STD=5 # used in time estimates
 export MAX_NUM_ROW=1000 # in each breakpoint file.
 export BACKEND="pplite" #pplite or None
 export OVERHEAD_TIME=5 # in minutes
@@ -27,4 +27,5 @@ export MFC_TARGET="./MinimalFunctionCache/src/minimalFunctionCache"
 export BKPTS_PATH_BASE="$MFC_TARGET/Breakpoints"
 export REP_ELEM_PATH_BASE="$MFC_TARGET/RepElems"
 export APPTAINER_DEF_PATH="./MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/Apptainer.def"
-
+# Testing
+export K=5

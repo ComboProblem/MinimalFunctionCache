@@ -10,7 +10,7 @@ import logging
 initial_gen_logger = logging.getLogger(__name__)
 logging_level = os.getenv("LOGGING_LEVEL")
 if logging_level == "debug":
-    initial_gen_logger.info(f"Adjusting the default logging level to DEBUG")
+    initial_gen_logger.info(f"Adjusting the default logging level to DEBUG")    
     initial_gen_logger.setLevel(logging.DEBUG)
 elif logging_level == "warning":
     initial_gen_logger.info(f"Adjusting the default logging level to WARNING")
@@ -20,8 +20,9 @@ elif logging_level == "error":
     initial_gen_logger.setLevel(logging.ERROR)
 else:
     initial_gen_logger.setLevel(logging.INFO)
+initial_gen_logger.info(f"Logging level set to {initial_gen_logger.level}")
 # read parameters from cache_gen_run_parameters.sh and setup_cache_run.sh
-def read_non_path_parameters():
+def read_non_path_parameters(path_to_file=None):
     """
     Read and validate non path parameters from cache_gen_run_parameters.sh and setup_cache_run.sh.
     """
@@ -41,36 +42,36 @@ def read_non_path_parameters():
     overhead_time = float(os.getenv("OVERHEAD_TIME")) # minutes
     if overhead_time == "":
         overhead_time = 5
-    run_computation_default = os.getenv("RUN_COMPUTAION")
-    if run_computation_default == "":
-        run_computation_default = None
-    if run_computation_default is not None:
-        if run_computation_default.lower().strip(" ") == "n" or run_computation_default.lower().strip(" ") == "no":
+    run_computation = os.getenv("RUN_COMPUTAION")
+    if run_computation == "":
+        run_computation = None
+    if run_computation is not None:
+        if run_computation.lower().strip(" ") == "n" or run_computation.lower().strip(" ") == "no":
             run_computation = False
-        elif run_computation_default.lower().strip(" ") == "y" or run_computation_default.lower().strip(" ") == "yes":
+        elif run_computation.lower().strip(" ") == "y" or run_computation.lower().strip(" ") == "yes":
             run_computation = True
         else:
             run_computation = None # signal to program to wait for user input.
     else:
         run_computation = None
-    run_params = {"k":k, "sample_size":sample_size, "time_per_batch":time_per_batch, "max_number_of_rows":max_number_of_rows, "max_std":max_std, "which_backend":which_backend, "overhead_time":overhead_time, "run_computation_default":run_computation_default}
-    logging.debug(f"Read Parameters: {run_params}")
+    run_params = {"k":k, "sample_size":sample_size, "time_per_batch":time_per_batch, "max_number_of_rows":max_number_of_rows, "max_std":max_std, "which_backend":which_backend, "overhead_time":overhead_time, "run_computation":run_computation}
+    initial_gen_logger.debug(f"Read Parameters: {run_params}")
     return run_params
 
 def validate_paths(run_params):
     """
     Read path environment variables and check existence. 
     """
-    paths = {"bkpts_path_base":os.getenv("BKPTS_PATH_BASE"), "rep_elem_path": os.genenv("REP_ELEM_PATH_BASE"), "temp":os.getenv("MFC_TEMP")}
+    paths = {"bkpts_path_base":os.getenv("BKPTS_PATH_BASE"), "rep_elem_path": os.getenv("REP_ELEM_PATH_BASE"), "temp":os.getenv("MFC_TEMP")}
     paths["bkpt_current_path"] = os.path.join(paths["bkpts_path_base"], str(run_params['k']))
     paths["bkpt_prev_path"] = os.path.join(paths["bkpts_path_base"], str(run_params['k']-1))
     parths_are_valid = True
     bad_paths = {}
     for path in paths:
         if os.path.exists(paths[path]):
-            initial_gen_logger.debug(f"Path {path} with dir {paths[path]} exists")
+            initial_gen_logger.debug(f"Path {path} with dir {paths[path]} exists.")
         else:
-            initial_gen_logger.debug(f"Path {path} with dir {paths[path]} does not exists")
+            initial_gen_logger.debug(f"Path {path} with dir {paths[path]} does not exists.")
             parths_are_valid = False
             bad_paths[path] = paths[path]
     if parths_are_valid is False:
@@ -81,16 +82,16 @@ def gen_bkpts(paths, run_params):
     """
     Tries to use the provided specific previous breakpoints path to generate the current jobs breakpoints.
     """
-    try:
-        if len(os.listdir(paths["prev_bkpts_path"])) > 0:
-            bkpts = BreakpointComplexClassContainer(run_params['k'], backend=run_params['which_backend'], manually_load_breakpoint_cache=True, file_or_foler="folder", path_to_file_or_foler=paths["prev_bkpts_path"])
-            initial_gen_logger.debug(f"Loading previous breakpoints from {}".format(paths["prev_bkpts_path"])
-        else:    
-            initial_gen_logger.debug(f"Path {} contains no files. Generating without previous information.".format(paths["prev_bkpts_path"]")
-            bkpts = BreakpointComplexClassContainer(run_params['k'], backend=run_params['which_backend'])
-    except FileNotFoundError:
-        initial_gen_logger.debug(f"Path {} does not exist. Generating without previous information.".format(paths["prev_bkpts_path"])
+    initial_gen_logger.debug("Number of files in {}\n {}".format(paths["bkpt_prev_path"], len(os.listdir(paths["bkpt_prev_path"]))))
+    if len(os.listdir(paths["bkpt_prev_path"])) > 0:
+        bkpts = BreakpointComplexClassContainer(run_params['k'], backend=run_params['which_backend'], manually_load_breakpoint_cache=True, folder_or_file="folder", path_to_file_or_folder=paths["bkpt_prev_path"])
+        initial_gen_logger.debug("Loading previous breakpoints from {}".format(paths["bkpt_prev_path"]))
+    else:
+        initial_gen_logger.debug("Path {} contains no files. Generating without previous information.".format(paths["bkpt_prev_path"]))
         bkpts = BreakpointComplexClassContainer(run_params['k'], backend=run_params['which_backend'])
+#    except FileNotFoundError:
+#        initial_gen_logger.debug("Path {} does not exist. Generating without previous information.".format(paths["bkpt_prev_path"]))
+#        bkpts = BreakpointComplexClassContainer(run_params['k'], backend=run_params['which_backend'])
     return bkpts
 
 def estimate_time(run_params, bkpts):
@@ -101,13 +102,13 @@ def estimate_time(run_params, bkpts):
     # bkpts.write_data(max_rows=max_lines_in_file)
     # Estimate cpu time per computation per breakpoint
     initial_gen_logger.info(f"Number of breakpoints sequences: {bkpts.num_rep_elems()}.\n Determining run time estimate.")
-    sample_space = sample(list(bkpts.get_rep_elems()), run_params['k'] = run_params['sample_size'])
+    sample_space = sample(list(bkpts.get_rep_elems()), run_params['sample_size'])
     initial_gen_logger.info("Sample space found; computing sample points...")
     # use real time estimations
     start = time.time()
     find_minimal_function_reps_from_bkpts(sample_space, backend=run_params['which_backend'])
     end = time.time()
-    average_sample_time = (end - start) / sample_size
+    average_sample_time = (end - start) / run_params['sample_size']
     initial_gen_logger.info(f"Sample computation time averages {average_sample_time:.2f} second per breakpoint sequence.")
     # find time to be used per batch.
     # Infer a reasonable time estimate based on user specifications and measured data.
@@ -126,14 +127,14 @@ def estimate_time(run_params, bkpts):
     initial_gen_logger.info("Inferring batch time estimate based on parameters")
     sample_std =  std(sample_space)
     initial_gen_logger.debug(f"Sample std: {sample_std}")
-    if overhead_time*60 > sample_std * max_std:
+    if run_params['overhead_time']*60 > sample_std * run_params['max_std']:
         time_alloc = run_params['time_per_batch'] + run_params['overhead_time']
     else:
         time_alloc = run_params['time_per_batch'] + (number_of_rows*sample_std * run_params['max_std'])/60
     time_alloc = int(time_alloc+1)
     initial_gen_logger.info(f"Allocated time batch: {time_alloc} minutes.")
     initial_gen_logger.info(f"Allocating {time_alloc * number_of_batches:.2f} minutes of CPU time.")
-    batch_info = {}
+    batch_info = {'number_of_rows':number_of_rows, 'number_of_batches':number_of_batches, 'time_alloc':time_alloc}
     initial_gen_logger.debug(f"Batch info: {batch_info}")
     return batch_info
 # Interactive decisions to authorize the computation.
@@ -165,7 +166,7 @@ def create_job(paths, run_params, batch_info):
         os.chdir(paths["temp"])
         with open(job_info_name, "w") as run_vars_file:
             run_vars_file.write("#!/bin/bash\n")
-            run_vars_file.write(f"export RUN_COMPUTATION=1\n")
+            run_vars_file.write(f"export run_computation=1\n")
             run_vars_file.write(f"export NUM_ROWS={batch_info['number_of_rows']}\n")
             run_vars_file.write(f"export NUM_JOBS={batch_info['number_of_batches']}\n")
             run_vars_file.write(f"export ALLOC_TIME_PER_JOB={batch_info['time_alloc']}")
@@ -173,7 +174,7 @@ def create_job(paths, run_params, batch_info):
         os.chdir(paths["temp"])
         with open(job_info_name, "w") as run_vars_file:
             run_vars_file.write("#!/bin/bash\n")
-            run_vars_file.write(f"export RUN_COMPUTATION=0")
+            run_vars_file.write(f"export run_computation=0")
 
 def __main__():
     initial_gen_logger.info("Reading Parameters and validating paths")
