@@ -9,7 +9,7 @@ echo "Parameters loaded; running cache generation."
 mkdir $MFC_TEMP
 }
 
-setup_file_system () {
+setup_file_system(){
 if [ ! -d "$BKPT_PATH_BASE/$NUM_BKPT" ]; then
     mkdir -p $BKPT_PATH_BASE/$NUM_BKPT
 else
@@ -61,7 +61,7 @@ for ((NUM_BKPT = $NUM_BKPT_LOWER_BOUND; NUM_BKPT <= $NUM_BKPT_UPPER_BOUND; NUM_B
 do
 echo "Starting run for $NUM_BKPT."
 
-setup_file_system () 
+setup_file_system() 
 
 setup_apptainer()
 
