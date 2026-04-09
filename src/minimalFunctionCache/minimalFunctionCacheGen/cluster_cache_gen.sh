@@ -66,8 +66,8 @@ do
 echo "Starting run for $NUM_BKPT."
 
 # setup file system
-if [ ! -d "$BKPT_PATH_BASE/$NUM_BKPT" ]; then
-    mkdir -p $BKPT_PATH_BASE/$NUM_BKPT
+if [ ! -d "$BKPTS_PATH_BASE/$NUM_BKPT" ]; then
+    mkdir -p $BKPTS_PATH_BASE/$NUM_BKPT
 else
     echo "path: $BKPT_PATH_BASE/$NUM_BKPT exists; proceed with caution."
 fi
