@@ -92,6 +92,7 @@ def gen_bkpts(paths, run_params):
 #    except FileNotFoundError:
 #        initial_gen_logger.debug("Path {} does not exist. Generating without previous information.".format(paths["bkpt_prev_path"]))
 #        bkpts = BreakpointComplexClassContainer(run_params['k'], backend=run_params['which_backend'])
+    initial_gen_logger.debug("{bkpts}")
     return bkpts
 
 def estimate_time(run_params, bkpts):

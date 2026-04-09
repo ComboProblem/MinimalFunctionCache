@@ -108,7 +108,7 @@ fi
 
 echo "Run setup complete $NUM_BKPT. Dispatching jobs."
 chmod +x ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/job_function_runner.sh
-sbatch --array=0-$NUM_JOBS --partition=$PARTITION --account=$CLUSTER_ACCOUNT --ntasks=1 --time=$ALLOC_TIME_PER_JOB:00 --mem=$MEM ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/job_function_runner.sh
+sbatch --array=0-$NUM_JOBS --partition=$PARTITION --account=$CLUSTER_ACCOUNT --ntasks=1 --time=$ALLOC_TIME_PER_JOB:00 --mem=$MEM ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/job_function_runner.sh $NUM_BKPT
 
 done
 echo "Cleaning temp files"
