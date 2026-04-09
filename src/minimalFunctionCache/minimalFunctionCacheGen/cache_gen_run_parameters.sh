@@ -27,5 +27,3 @@ export MFC_TARGET="./MinimalFunctionCache/src/minimalFunctionCache"
 export BKPTS_PATH_BASE="$MFC_TARGET/Breakpoints"
 export REP_ELEM_PATH_BASE="$MFC_TARGET/RepElems"
 export APPTAINER_DEF_PATH="./MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/Apptainer.def"
-# Testing
-export K=5
