@@ -76,5 +76,5 @@ echo "Cleaning temp files"
 rm -rf $MFC_TEMP
 }
 
-main()
+main
 
