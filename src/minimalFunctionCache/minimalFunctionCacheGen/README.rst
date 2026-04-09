@@ -12,7 +12,7 @@ Requirements
 
 - a terminal text editor (``vim``, ``nano``, ``emacs``, ect).
 
-- ``git``
+- ``git``.
 
 Generating the Cache
 ~~~~~~~~~~~~~~~~~~~~
@@ -25,10 +25,16 @@ Generating the Cache
 
     vim ./MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/cache_gen_run_parameters.sh
 
+- (Optionally) If ssh-ing into the cluster, use ``tmux`` to keep the script running after closing the terminal.::
+
+    tmux
+
 - Compile and run the job generation and submission script.::
 
     chmod +x ./MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/cluster_cache_gen.sh
     ./MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/cluster_cache_gen.sh
+
+- If using ``tmux`` use ``ctr+b`` , ``d`` to exit the session. A ``session_number`` will be printed. Use ``tmux attach -t session_number`` to view the session.
 
 - When finished; you can use git to make a PR to submit the additionally generated function cache or move to desired repository. An example to make a PR to the main MinimalFunctionCache repository.::
 

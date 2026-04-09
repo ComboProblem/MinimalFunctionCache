@@ -1,20 +1,20 @@
-#!/bin/bash -x
+#!/bin/bash
 
 #SLURM JOB INFORMATION
 export CLUSTER_ACCOUNT=math-grp
 export PARTITION=high
-export MEM=4gb
-export INITAL_TIME=120 # in minutes
+export MEM=1gb
+declare -i INITAL_TIME=5 # in minutes
 # Set cache computation parameters
-declare -i NUM_BKPT_LOWER_BOUND=3 # integers, lower <= upper bound
-declare -i NUM_BKPT_UPPER_BOUND=4 
+declare -i NUM_BKPT_LOWER_BOUND=2 # integers, lower <= upper bound
+declare -i NUM_BKPT_UPPER_BOUND=2
 export SAVE_REP_ELEMS=true # bash bool
 export SUBMIT_TO_GITHUB=true # bash bool
 # For estimating cpu time.
 export SAMPLE_SIZE=2 # increasing sample size increases the initial run time which could long with current implementation.
-export TIME_PER_BATCH=60 # measured in minutes
-export OVERHEAD_TIME_PER_BATCH=5 # in minutes
-export MAX_STD=5 # used in time estimates
+export TIME_PER_BATCH=10 # measured in minutes
+export OVERHEAD_TIME_PER_BATCH=1 # in minutes
+export MAX_STD=3 # used in time estimates
 export MAX_NUM_ROW=1000 # in each breakpoint file.
 export BACKEND="pplite" #pplite or None
 export OVERHEAD_TIME=5 # in minutes
