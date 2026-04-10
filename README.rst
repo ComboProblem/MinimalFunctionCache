@@ -1,40 +1,39 @@
 Minimal Function Cache
 ~~~~~~~~~~~~~~~~~~~~~~
 
-Minimal Function Cache is a repository for a proposed cut generation method in the thesis of Acadia Larsen which uses an explicit method select optimal cuts over a space of valid intersection cuts for a given MIP relaxation basis. 
+Minimal Function Cache is a repository containing two packages python packages ``minimalFunctionCache`` and ``parametricCutGen``.
 
-The repository is in an alpha state. User be ware.
+``minimalFunctionCache`` is a optional package for ``cutgeneratingfunctiology`` which contains precomputed cell descptions of minimal functions with at most :math: `k` breakpoints where :math: `k=6`. This repository is in a beta state.
+
+``parametricCutGen`` is a package which implemments a single row optiomal cut selection for Mixed Integer Programs over the domain (and restricted domains) of continuous minimal functions with at most :math: `k` breakpoints. This repository is in an alpha state.
+
+These packages are based on the disseration of Acadia Larsen. 
 
 Included Software and Tools
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Experimental Cut and Branch Solver using explicitly optimized cuts over the space of minimal functions with a finite number of breakpoints. 
+- ``minimalFunctionCache`` includes precomputed cell descriptions of minimal functions, code for generating the function cache on a HPC, and a comparison of ``ppl`` and ``pplite`` as polyhedral backends.  
 
-- Code for generating representative elements of minimal functions for a semialgebraic parametric description of minimal functions in the Gomory Johnson Group Problem using high performance computing cluster.
+- ``parametricCutGen`` is implemented to work with ``pyscipopt`` the python wrapper of ``SCIP``. This package includes a solver for cut selection problems over the domain (with possibly some constraints) of continuous minimal functions, an interface to ``pyscipopt`` and reproduceable parametric experinments for testing cut selection.
 
-- A cache of computed representative elements.
-
-- Reproducible computational experiments.
 
 Goals and Non-Goals
 ~~~~~~~~~~~~~~~~~~~
 
- - Illustrate concept of explicit optimal cut selection.
+ - Illustrate concept of explicit optimal cut selection as a proof of concept for MIP solvers. 
 
- - Reproducible on local and HPC machines.
+ - Reproducibliblity of experimental data.
 
- - Mathematical correctness of cut generation.
+ - Mathematical correctness of cut generation up to some :math: `(M,\epsilon)` parameters. 
 
- - Interface with current optimization software ``pyscipopt``.
-
- - Demonstrate use of ``passsagemath`` in application.
+ - Demonstrate use of ``passsagemath`` in application; in particular illustrate application of cutting edge mathematics to application of MIPs.
    
 Non-goals
 ~~~~~~~~~
 
  - Performance and code optimization; the cut generation technique presented is a proof of concept and is intended to function (for practical problem) with an excess of compute.
 
- - Documentation light. 
+ - Documenation; documentation and testing is minimal. What is written is what is requried to reproduce the results for an expert user. 
 
 Installation
 ~~~~~~~~~~~~
