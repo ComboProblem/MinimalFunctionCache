@@ -20,7 +20,7 @@ requires-python = ">=3.9"
 license = "GPL-2.0-or-later"
 keywords = ["integer programming", "cutting planes"]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",

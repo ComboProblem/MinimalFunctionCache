@@ -86,12 +86,15 @@ fi
 echo "Running inital setup."
 chmod +x ./MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/setup_cache_run.sh
 #if [ "$FLAGS" == *c* ]; then 
-sbatch --partition=$PARTITION --account=$CLUSTER_ACCOUNT --ntasks=1 --cpus-per-task=1 --time="$INITAL_TIME:00" --mem=$MEM --wait ./MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/setup_cache_run.sh $NUM_BKPT
+# TODO: This step could be distributed to generate larger caches. 
+# One approach would be to using 1/nth of the cache files to generate the next set of breakpoints then refine the space in a way that doesn't require loading the whole breakpoint sequence into memory.
+# The second is to figure out the correct underlying combinatorics underying equivlance classes of breakpoints and using that.
+sbatch --partition=$PARTITION --account=$CLUSTER_ACCOUNT --ntasks=1 --cpus-per-task=1 --time="$INITAL_TIME:00" --mem=$BKPT_MEM --wait ./MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/setup_cache_run.sh $NUM_BKPT
 #else
 # ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/setup_cache_run.sh $NUM_BKPT
 #fi
 # Now load job info
-source $MFC_TEMP/temp_job_info_for_$NUM_BKPT.sh
+source "$MFC_TEMP/temp_job_info_for_$NUM_BKPT.sh"
 
 # check if we should keep goin'
 if [ '$RUN_COMPUTATION' == '0' ]; then
@@ -105,7 +108,7 @@ fi
 
 # echo "Run setup complete $NUM_BKPT. Dispatching jobs."
 chmod +x ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/job_function_runner.sh
-sbatch --array=0-$NUM_JOBS --partition=$PARTITION --account=$CLUSTER_ACCOUNT --ntasks=1 --time="$ALLOC_TIME_PER_JOB:00" --mem=$MEM ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/job_function_runner.sh $NUM_BKPT
+sbatch --array=0-$NUM_JOBS --partition=$PARTITION --account=$CLUSTER_ACCOUNT --ntasks=1 --time="$ALLOC_TIME_PER_JOB:00" --mem=$REP_ELEM_MEM ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/job_function_runner.sh $NUM_BKPT
 
 done
 echo "Cleaning temp files"
