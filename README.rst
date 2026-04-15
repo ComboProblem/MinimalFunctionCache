@@ -1,39 +1,20 @@
 Minimal Function Cache
 ~~~~~~~~~~~~~~~~~~~~~~
+``minimalFunctionCache`` is a optional package for ``cutgeneratingfunctiology`` which contains necessary data for using pre-computed cell descriptions of the space of continuous minimal functions with at most :math:`k` breakpoints where :math:`k=7`. This repository is in a beta state.
 
-Minimal Function Cache is a repository containing two packages python packages ``minimalFunctionCache`` and ``parametricCutGen``.
+This package is based on the dissertation of Acadia Larsen. 
 
-``minimalFunctionCache`` is a optional package for ``cutgeneratingfunctiology`` which contains precomputed cell descptions of minimal functions with at most :math: `k` breakpoints where :math: `k=6`. This repository is in a beta state.
+Notes
+~~~~~
 
-``parametricCutGen`` is a package which implemments a single row optiomal cut selection for Mixed Integer Programs over the domain (and restricted domains) of continuous minimal functions with at most :math: `k` breakpoints. This repository is in an alpha state.
+- Data is written in .cvs files.
+- pip installable from cloned repository.
+- Tools to (re)generate data using a HPC.
+- Practical evidence for polyedral computational speed ups provided by ``pplite`` as compared to ``ppl``.
 
-These packages are based on the disseration of Acadia Larsen. 
-
-Included Software and Tools
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-- ``minimalFunctionCache`` includes precomputed cell descriptions of minimal functions, code for generating the function cache on a HPC, and a comparison of ``ppl`` and ``pplite`` as polyhedral backends.  
-
-- ``parametricCutGen`` is implemented to work with ``pyscipopt`` the python wrapper of ``SCIP``. This package includes a solver for cut selection problems over the domain (with possibly some constraints) of continuous minimal functions, an interface to ``pyscipopt`` and reproduceable parametric experinments for testing cut selection.
-
-
-Goals and Non-Goals
-~~~~~~~~~~~~~~~~~~~
-
- - Illustrate concept of explicit optimal cut selection as a proof of concept for MIP solvers. 
-
- - Reproducibliblity of experimental data.
-
- - Mathematical correctness of cut generation up to some :math: `(M,\epsilon)` parameters. 
-
- - Demonstrate use of ``passsagemath`` in application; in particular illustrate application of cutting edge mathematics to application of MIPs.
-   
-Non-goals
-~~~~~~~~~
-
- - Performance and code optimization; the cut generation technique presented is a proof of concept and is intended to function (for practical problem) with an excess of compute.
-
- - Documenation; documentation and testing is minimal. What is written is what is requried to reproduce the results for an expert user. 
+Documentation
+~~~~~~~~~~~~~
+Documentation is minimal as this repository is intended to be a purely optional data source for ``cutgeneratingfunctionology``.
 
 Installation
 ~~~~~~~~~~~~
@@ -64,10 +45,10 @@ Installation
 
 - Start using the function cache in sagemath::
 
-    cd ..
     sage
     sage: from cutgenerationfunctionology.igp import PiMinContConatiner
-    sage: MinFun_with_at_most_5_breakpoints = PiMinContConatiner(5) # loaded with the function cache!
+    sage: Pi5 = PiMinContConatiner(5) # loaded with the function cache!
+    sage: Pi5_cell_description = [cell for cell in Pi5.get_semialgebraic_sets()]
 
 License 
 ~~~~~~~
