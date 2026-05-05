@@ -6,7 +6,7 @@ from sage.rings.rational_field import QQ
 
 
 utils_logger = logging.getLogger(__name__)
-
+utils_logger.setLevel(logging.INFO)
 def minimal_function_cache_dir():
     """
     Returns directory information for accessing the minimal function cache.
@@ -72,12 +72,17 @@ def minimal_function_cache_loader(n, breakpoints_or_rep_elems, prototype=QQ):
         rep_elems = []
         rep_elem_path = fun_cache_dir["rep_elem_base_path"] / str(n)
         for file in list(rep_elem_path.glob('*.csv')):
+            utils_logger.debug(f"file:{file}")            
             with open(file, newline='') as csvfile:
                 file_reader = csv.reader(csvfile)
+                utils_logger.debug(f"file_reader:{file_reader}")
                 for row in file_reader:
-                    bkpt = [QQ(data) for data in row[0].strip("[]").split(",")]
-                    val = [QQ(data) for data in row[1].strip("[]").split(",")]
-                    rep_elems.append((bkpt, val))
+                    try:
+                        bkpt = [prototype(data) for data in row[0].strip("[]").split(",")]
+                        val = [prototype(data) for data in row[1].strip("[]").split(",")]
+                        rep_elems.append((bkpt, val))
+                    except IndexError:
+                        pass                        
         return rep_elems
     else:
         raise ValueError("A cache has not been loaded, check spelling and inputs.")
