@@ -21,7 +21,7 @@ echo "Checking for apptainer."
 module load apptainer
 if [ ! -f "MinimalFunctionCache/src/minimalFunctionCacheGen/cgf.sif" ]; then
   echo "Building apptainer"
-  apptainer build "$MFC_TEMP/cgf_mem.sif" "MinimalFunctionCache/src/minimalFunctionCacheGen/MemoryProfilingApptainer_prof.def"
+  apptainer build "$MFC_TEMP/cgf_mem.sif" "MinimalFunctionCache/src/minimalFunctionCacheGen/MemoryProfiling/Apptainer_profile.def"
 else
    echo "cutgeneratingfunctiology image already exists."
 fi
