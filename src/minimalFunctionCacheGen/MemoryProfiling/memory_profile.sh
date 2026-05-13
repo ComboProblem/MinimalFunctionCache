@@ -27,7 +27,7 @@ else
 fi
 
 chmod +x ~/MinimalFunctionCache/src/minimalFunctionCacheGen/MemoryProfiling/memory_profile_run.sh
-sjob --partition=$PARTITION --account=$CLUSTER_ACCOUNT --ntasks=1 --time="720:00" --mem=50G ~/MinimalFunctionCache/src/minimalFunctionCacheGen/memory_profile_run.sh
+srun --partition=$PARTITION --account=$CLUSTER_ACCOUNT --ntasks=1 --time="720:00" --mem=50G ~/MinimalFunctionCache/src/minimalFunctionCacheGen/memory_profile_run.sh
 
 rm -rf $MFC_TEMP
 }
