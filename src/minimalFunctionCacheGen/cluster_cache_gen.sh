@@ -4,7 +4,7 @@
 export FLAGS="$1"
 
 get_parameters_and_load_temp(){
-source ./MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/cache_gen_run_parameters.sh
+source ./MinimalFunctionCache/src/minimalFunctionCacheGen/cache_gen_run_parameters.sh
 echo "Parameters loaded; running cache generation."
 mkdir $MFC_TEMP
 }
@@ -24,7 +24,7 @@ fi
 
 setup_cache_run(){
 echo "Running inital setup."
-chmod +x ./MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/setup_cache_run.sh
+chmod +x ./MinimalFunctionCache/src/minimalFunctionCacheGen/setup_cache_run.sh
 #if [ "$FLAGS" == *c* ]; then 
 srun --partition=$PARTITION --account=$CLUSTER_ACCOUNT --ntasks=1 --cpus-per-task=1 --time=$INITAL_TIME:00 --wait ./MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/setup_cache_run.sh $NUM_BKPT
 #else
@@ -47,15 +47,17 @@ fi
 setup_apptainer(){
 echo "Checking for apptainer."
 module load apptainer
-if [ ! -f "$MFC_TARGET/cgf.sif" ]; then
+if [ ! -f "MinimalFunctionCache/src/minimalFunctionCacheGen/cgf.sif" ]; then
   echo "Building apptainer"
-  apptainer build "$MFC_TARGET/cgf.sif" "$APPTAINER_DEF_PATH"
+  apptainer build "MinimalFunctionCache/src/minimalFunctionCacheGen/cgf.sif/cgf.sif" "MinimalFunctionCache/src/minimalFunctionCacheGen/Apptainer.def"
+else
+   echo "Cutgeneratingfunctiology image already exists."
 fi
 }
 
 main(){
 # get parameters and load temp
-source ./MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/cache_gen_run_parameters.sh
+source ./MinimalFunctionCache/src/minimalFunctionCacheGen/cache_gen_run_parameters.sh
 echo "Parameters loaded; running cache generation."
 mkdir $MFC_TEMP
 for ((NUM_BKPT = $NUM_BKPT_LOWER_BOUND; NUM_BKPT <= $NUM_BKPT_UPPER_BOUND; NUM_BKPT++))
@@ -77,19 +79,21 @@ fi
 #setup_apptainer
 echo "Checking for apptainer."
 module load apptainer
-if [ ! -f "$MFC_TARGET/cgf.sif" ]; then
+if [ ! -f "MinimalFunctionCache/src/minimalFunctionCacheGen/cgf.sif" ]; then
   echo "Building apptainer"
-  apptainer build "$MFC_TARGET/cgf.sif" "$APPTAINER_DEF_PATH"
+  apptainer build "MinimalFunctionCache/src/minimalFunctionCacheGen/cgf.sif" "MinimalFunctionCache/src/minimalFunctionCacheGen/Apptainer.def"
+else
+   echo "Cutgeneratingfunctiology image already exists."
 fi
 
 # setup_cache_run
-echo "Running inital setup."
+echo "Running initial setup."
 chmod +x ./MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/setup_cache_run.sh
 #if [ "$FLAGS" == *c* ]; then 
 # TODO: This step could be distributed to generate larger caches. 
-# One approach would be to using 1/nth of the cache files to generate the next set of breakpoints then refine the space in a way that doesn't require loading the whole breakpoint sequence into memory.
+# One approach would be to using 1/nth of the cache files to generate the next set of breakpoints then refine the space in a way that does not require loading the whole breakpoint sequence into memory.
 # The second is to figure out the correct underlying combinatorics underying equivlance classes of breakpoints and using that.
-sbatch --partition=$PARTITION --account=$CLUSTER_ACCOUNT --ntasks=1 --cpus-per-task=1 --time="$INITAL_TIME:00" --mem=$BKPT_MEM --wait ./MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/setup_cache_run.sh $NUM_BKPT
+sbatch --partition=$PARTITION --account=$CLUSTER_ACCOUNT --ntasks=1 --cpus-per-task=1 --time="$INITAL_TIME:00" --mem=$BKPT_MEM --wait ./MinimalFunctionCache/src/minimalFunctionCacheGen/setup_cache_run.sh $NUM_BKPT
 #else
 # ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/setup_cache_run.sh $NUM_BKPT
 #fi
@@ -103,12 +107,12 @@ if [ '$RUN_COMPUTATION' == '0' ]; then
   rm -rf $MFC_TEMP
   exit 0
 else
-  echo "Run Approved - Computing function cache for  $NUM_BKPT. Disbatching jobs."
+  echo "Run Approved - Computing function cache for  $NUM_BKPT. Dispatching jobs."
 fi
 
 # echo "Run setup complete $NUM_BKPT. Dispatching jobs."
-chmod +x ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/job_function_runner.sh
-sbatch --array=0-$NUM_JOBS --partition=$PARTITION --account=$CLUSTER_ACCOUNT --ntasks=1 --time="$ALLOC_TIME_PER_JOB:00" --mem=$REP_ELEM_MEM ~/MinimalFunctionCache/src/minimalFunctionCache/minimalFunctionCacheGen/job_function_runner.sh $NUM_BKPT
+chmod +x ~/MinimalFunctionCache/src/minimalFunctionCacheGen/job_function_runner.sh
+sbatch --array=0-$NUM_JOBS --partition=$PARTITION --account=$CLUSTER_ACCOUNT --ntasks=1 --time="$ALLOC_TIME_PER_JOB:00" --mem=$REP_ELEM_MEM ~/MinimalFunctionCache/src/minimalFunctionCacheGen/job_function_runner.sh $NUM_BKPT
 
 done
 echo "Cleaning temp files"

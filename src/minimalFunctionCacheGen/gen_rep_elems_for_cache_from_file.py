@@ -1,4 +1,3 @@
-# from sys import argv as system_args
 from cutgeneratingfunctionology.igp import *
 import os
 import logging
