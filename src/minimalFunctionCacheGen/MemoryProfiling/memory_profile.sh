@@ -17,17 +17,11 @@ source ./MinimalFunctionCache/src/minimalFunctionCacheGen/cache_gen_run_paramete
 echo "Parameters loaded; running cache generation."
 mkdir $MFC_TEMP
 #setup_apptainer
-echo "Checking for apptainer."
 module load apptainer
-if [ ! -f "MinimalFunctionCache/src/minimalFunctionCacheGen/cgf.sif" ]; then
-  echo "Building apptainer"
-  apptainer build "$MFC_TEMP/cgf_mem.sif" "MinimalFunctionCache/src/minimalFunctionCacheGen/MemoryProfiling/Apptainer_profile.def"
-else
-   echo "cutgeneratingfunctiology image already exists."
-fi
+apptainer build "$MFC_TEMP/cgf_mem.sif" "MinimalFunctionCache/src/minimalFunctionCacheGen/MemoryProfiling/Apptainer_profile.def"
 
 chmod +x ~/MinimalFunctionCache/src/minimalFunctionCacheGen/MemoryProfiling/memory_profile_run.sh
-srun --partition=$PARTITION --account=$CLUSTER_ACCOUNT --ntasks=1 --time="720:00" --mem=50G ~/MinimalFunctionCache/src/minimalFunctionCacheGen/memory_profile_run.sh
+srun --partition=$PARTITION --account=$CLUSTER_ACCOUNT --ntasks=1 --time="720:00" --mem=50G ~/MinimalFunctionCache/src/minimalFunctionCacheGen/MemoryProfiling/memory_profile_run.sh
 
 rm -rf $MFC_TEMP
 }

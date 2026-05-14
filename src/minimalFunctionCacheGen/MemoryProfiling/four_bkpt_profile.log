@@ -1,0 +1,170 @@
+2026-05-14 12:11:58,793 - memory_profile_log - INFO - Filename: MinimalFunctionCache/src/minimalFunctionCacheGen/MemoryProfiling/profile_breakpoints.py
+
+
+2026-05-14 12:11:58,793 - memory_profile_log - INFO - Line #    Mem usage    Increment  Occurrences   Line Contents
+
+2026-05-14 12:11:58,793 - memory_profile_log - INFO - =============================================================
+
+2026-05-14 12:11:58,794 - memory_profile_log - INFO -     25  219.066 MiB  219.066 MiB           1   @profile    
+
+2026-05-14 12:11:58,794 - memory_profile_log - INFO -     26                                         def make_rep_bkpts_with_len_n(n, k=1, bkpts=None, backend=None):
+
+2026-05-14 12:11:58,794 - memory_profile_log - INFO -     27                                             r"""
+
+2026-05-14 12:11:58,794 - memory_profile_log - INFO -     28                                             Produce representative elements of every isomorphism class of breakpoints complexes for breakpoint sequences of length n.
+
+2026-05-14 12:11:58,794 - memory_profile_log - INFO -     29                                         
+
+2026-05-14 12:11:58,794 - memory_profile_log - INFO -     30                                             INPUT:
+
+2026-05-14 12:11:58,794 - memory_profile_log - INFO -     31                                             - n, integer, maximum length of breakpoint sequence.
+
+2026-05-14 12:11:58,794 - memory_profile_log - INFO -     32                                             - k, assumed length of breakpoint sequences in ``bkpts``.
+
+2026-05-14 12:11:58,794 - memory_profile_log - INFO -     33                                             - bkpts, list of breakpoint sequences of length k.
+
+2026-05-14 12:11:58,794 - memory_profile_log - INFO -     34                                         
+
+2026-05-14 12:11:58,794 - memory_profile_log - INFO -     35                                             OUTPUT: A list of representative elements of every isomorphism class of breakpoints complexes for breakpoint sequences of length n extrapolated from bkpts.
+
+2026-05-14 12:11:58,795 - memory_profile_log - INFO -     36                                         
+
+2026-05-14 12:11:58,795 - memory_profile_log - INFO -     37                                             EXAMPLES::
+
+2026-05-14 12:11:58,795 - memory_profile_log - INFO -     38                                         
+
+2026-05-14 12:11:58,795 - memory_profile_log - INFO -     39                                             sage: from cutgeneratingfunctionology.igp import *
+
+2026-05-14 12:11:58,795 - memory_profile_log - INFO -     40                                             sage: logging.disable(logging.INFO) # suppress logging for tests
+
+2026-05-14 12:11:58,795 - memory_profile_log - INFO -     41                                             sage: make_rep_bkpts_with_len_n(2)
+
+2026-05-14 12:11:58,795 - memory_profile_log - INFO -     42                                             [(0, 1/2), (0, 13/18), (0, 5/18)]
+
+2026-05-14 12:11:58,795 - memory_profile_log - INFO -     43                                         
+
+2026-05-14 12:11:58,795 - memory_profile_log - INFO -     44                                             The number of representative elements grows quickly::
+
+2026-05-14 12:11:58,795 - memory_profile_log - INFO -     45                                         
+
+2026-05-14 12:11:58,795 - memory_profile_log - INFO -     46                                             sage: bkpts_rep_with_len_3 = make_rep_bkpts_with_len_n(3)
+
+2026-05-14 12:11:58,795 - memory_profile_log - INFO -     47                                             sage: len(bkpts_rep_with_len_3)
+
+2026-05-14 12:11:58,795 - memory_profile_log - INFO -     48                                             34
+
+2026-05-14 12:11:58,795 - memory_profile_log - INFO -     49                                         
+
+2026-05-14 12:11:58,795 - memory_profile_log - INFO -     50                                             Previous computations can be reused::
+
+2026-05-14 12:11:58,795 - memory_profile_log - INFO -     51                                         
+
+2026-05-14 12:11:58,795 - memory_profile_log - INFO -     52                                             sage: bkpts_rep_with_len_4 = make_rep_bkpts_with_len_n(4, 3, bkpts_rep_with_len_3)
+
+2026-05-14 12:11:58,795 - memory_profile_log - INFO -     53                                             sage: len(bkpts_rep_with_len_4)
+
+2026-05-14 12:11:58,795 - memory_profile_log - INFO -     54                                             329
+
+2026-05-14 12:11:58,795 - memory_profile_log - INFO -     55                                             """
+
+2026-05-14 12:11:58,795 - memory_profile_log - INFO -     56                                             # Matthias has suggested looking at a directed tree.
+
+2026-05-14 12:11:58,795 - memory_profile_log - INFO -     57                                             # An alternative approach would be to look into using a (graded) lattice as a data structure.
+
+2026-05-14 12:11:58,795 - memory_profile_log - INFO -     58                                             # We have bkpt \leq bkpt' if and only if dim(NNC(bkpt)) \leq dim(NNC(bkpt'))
+
+2026-05-14 12:11:58,795 - memory_profile_log - INFO -     59                                             # and embed(NNC(bkpt), dim(NNC(bkpt')) \leq NNC(bkpt') in the poset of NNC polyhedra.
+
+2026-05-14 12:11:58,795 - memory_profile_log - INFO -     60                                             # This might speed up/less the load of verifying unquiness of cells which is the time bounding task here.
+
+2026-05-14 12:11:58,796 - memory_profile_log - INFO -     61  219.066 MiB    0.000 MiB           1       new_bkpts = []
+
+2026-05-14 12:11:58,796 - memory_profile_log - INFO -     62  219.066 MiB    0.000 MiB           1       if n < 2:
+
+2026-05-14 12:11:58,796 - memory_profile_log - INFO -     63                                                 raise ValueError("n>=2")
+
+2026-05-14 12:11:58,796 - memory_profile_log - INFO -     64  219.066 MiB    0.000 MiB           1       if k == n and bkpts is not None:
+
+2026-05-14 12:11:58,796 - memory_profile_log - INFO -     65                                                 minimal_funciton_cell_description_logger.warning(f"Initial inputs suggest that the bkpts provided are already correct. Returning the initial bkpts.")
+
+2026-05-14 12:11:58,796 - memory_profile_log - INFO -     66                                                 return bkpts
+
+2026-05-14 12:11:58,796 - memory_profile_log - INFO -     67  219.066 MiB    0.000 MiB           1       if k == n and bkpts is None:
+
+2026-05-14 12:11:58,796 - memory_profile_log - INFO -     68                                                 raise ValueError("k<n")
+
+2026-05-14 12:11:58,796 - memory_profile_log - INFO -     69  219.066 MiB    0.000 MiB           1       if k == 1 and bkpts is None:
+
+2026-05-14 12:11:58,796 - memory_profile_log - INFO -     70                                                 bkpts = [[0]]
+
+2026-05-14 12:11:58,796 - memory_profile_log - INFO -     71  225.066 MiB   -0.531 MiB          35       for bkpt in bkpts:
+
+2026-05-14 12:11:58,796 - memory_profile_log - INFO -     72  225.066 MiB    5.469 MiB          34           new_bkpts += add_breakpoints_and_find_equiv_classes(nnc_poly_from_bkpt_sequence(bkpt, backend=backend).upstairs())
+
+2026-05-14 12:11:58,796 - memory_profile_log - INFO -     73  225.098 MiB    0.031 MiB           1       new_bkpts = unique_list(new_bkpts)
+
+2026-05-14 12:11:58,796 - memory_profile_log - INFO -     74  225.098 MiB    0.000 MiB           1       k += 1
+
+2026-05-14 12:11:58,796 - memory_profile_log - INFO -     75  225.098 MiB    0.000 MiB           1       if k == n:
+
+2026-05-14 12:11:58,796 - memory_profile_log - INFO -     76  225.180 MiB    0.082 MiB           1           minimal_funciton_cell_description_logger.info(f"Breakpoints of length {n} have been generated.")
+
+2026-05-14 12:11:58,796 - memory_profile_log - INFO -     77  225.184 MiB    0.004 MiB           1           return new_bkpts
+
+2026-05-14 12:11:58,796 - memory_profile_log - INFO -     78                                             else:
+
+2026-05-14 12:11:58,796 - memory_profile_log - INFO -     79                                                 minimal_funciton_cell_description_logger.info(f"Breakpoints of length {k} have been generated. Now generating breakpoints of length {k+1}.")
+
+2026-05-14 12:11:58,796 - memory_profile_log - INFO -     80                                                 return make_rep_bkpts_with_len_n(n, k, new_bkpts, backend)
+
+2026-05-14 12:11:58,796 - memory_profile_log - INFO - 
+
+
+2026-05-14 12:15:54,449 - memory_profile_log - INFO - Filename: MinimalFunctionCache/src/minimalFunctionCacheGen/MemoryProfiling/profile_breakpoints.py
+
+
+2026-05-14 12:15:54,456 - memory_profile_log - INFO - Line #    Mem usage    Increment  Occurrences   Line Contents
+
+2026-05-14 12:15:54,456 - memory_profile_log - INFO - =============================================================
+
+2026-05-14 12:15:54,456 - memory_profile_log - INFO -     24  218.797 MiB  218.797 MiB           1   @profile    
+
+2026-05-14 12:15:54,456 - memory_profile_log - INFO -     25                                         def make_rep_bkpts_with_len_n_profile_edition(n, k=1, bkpts=None, backend=None):
+
+2026-05-14 12:15:54,456 - memory_profile_log - INFO -     26  218.797 MiB    0.000 MiB           1       new_bkpts = []
+
+2026-05-14 12:15:54,456 - memory_profile_log - INFO -     27  218.797 MiB    0.000 MiB           1       if n < 2:
+
+2026-05-14 12:15:54,456 - memory_profile_log - INFO -     28                                                 raise ValueError("n>=2")
+
+2026-05-14 12:15:54,456 - memory_profile_log - INFO -     29  218.797 MiB    0.000 MiB           1       if k == n and bkpts is not None:
+
+2026-05-14 12:15:54,456 - memory_profile_log - INFO -     30                                                 return bkpts
+
+2026-05-14 12:15:54,456 - memory_profile_log - INFO -     31  218.797 MiB    0.000 MiB           1       if k == n and bkpts is None:
+
+2026-05-14 12:15:54,456 - memory_profile_log - INFO -     32                                                 raise ValueError("k<n")
+
+2026-05-14 12:15:54,456 - memory_profile_log - INFO -     33  218.797 MiB    0.000 MiB           1       if k == 1 and bkpts is None:
+
+2026-05-14 12:15:54,456 - memory_profile_log - INFO -     34                                                 bkpts = [[0]]
+
+2026-05-14 12:15:54,456 - memory_profile_log - INFO -     35  225.168 MiB    0.000 MiB          35       for bkpt in bkpts:
+
+2026-05-14 12:15:54,456 - memory_profile_log - INFO -     36  225.168 MiB    6.371 MiB          34           new_bkpts += add_breakpoints_and_find_equiv_classes(nnc_poly_from_bkpt_sequence(bkpt, backend=backend).upstairs())
+
+2026-05-14 12:15:54,456 - memory_profile_log - INFO -     37  225.199 MiB    0.031 MiB           1       new_bkpts = unique_list(new_bkpts)
+
+2026-05-14 12:15:54,456 - memory_profile_log - INFO -     38  225.199 MiB    0.000 MiB           1       k += 1
+
+2026-05-14 12:15:54,456 - memory_profile_log - INFO -     39  225.199 MiB    0.000 MiB           1       if k == n:
+
+2026-05-14 12:15:54,456 - memory_profile_log - INFO -     40  225.199 MiB    0.000 MiB           1           return new_bkpts
+
+2026-05-14 12:15:54,456 - memory_profile_log - INFO -     41                                             else:
+
+2026-05-14 12:15:54,456 - memory_profile_log - INFO -     42                                                 return make_rep_bkpts_with_len_n(n, k, new_bkpts, backend)
+
+2026-05-14 12:15:54,456 - memory_profile_log - INFO - 
+
+

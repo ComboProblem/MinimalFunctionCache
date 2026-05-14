@@ -1,51 +1,32 @@
-from cutgeneratingfuctionology.igp import *
-from minimalFunctionCache import utils
+from cutgeneratingfunctionology.igp import *
+from minimalFunctionCache.utils import *
+from memory_profiler import LogFile
+import sys
+# create logger
+logger = logging.getLogger('memory_profile_log')
+logger.setLevel(logging.DEBUG)
+
+# create file handler which logs even debug messages
+fh = logging.FileHandler("MinimalFunctionCache/src/minimalFunctionCacheGen/MemoryProfiling/four_bkpt_profile.log")
+fh.setLevel(logging.DEBUG)
+
+# create formatter
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+fh.setFormatter(formatter)
+
+# add the handlers to the logger
+logger.addHandler(fh)
+sys.stdout = LogFile('memory_profile_log', reportIncrementFlag=False)
 
 six_bkpts = minimal_function_cache_loader(6, "breakpoints")
 
-out_file =  open("./src/minimalFunctionCacheGen/MemoryProfiling/seven_bkpt_profile.log", "w+")
-
-@profile(stream=out_file)
-def make_rep_bkpts_with_len_n(n, k=1, bkpts=None, backend=None):
-    r"""
-    Produce representative elements of every isomorphism class of breakpoints complexes for breakpoint sequences of length n.
-
-    INPUT:
-    - n, integer, maximum length of breakpoint sequence.
-    - k, assumed length of breakpoint sequences in ``bkpts``.
-    - bkpts, list of breakpoint sequences of length k.
-
-    OUTPUT: A list of representative elements of every isomorphism class of breakpoints complexes for breakpoint sequences of length n extrapolated from bkpts.
-
-    EXAMPLES::
-
-    sage: from cutgeneratingfunctionology.igp import *
-    sage: logging.disable(logging.INFO) # suppress logging for tests
-    sage: make_rep_bkpts_with_len_n(2)
-    [(0, 1/2), (0, 13/18), (0, 5/18)]
-
-    The number of representative elements grows quickly::
-
-    sage: bkpts_rep_with_len_3 = make_rep_bkpts_with_len_n(3)
-    sage: len(bkpts_rep_with_len_3)
-    34
-
-    Previous computations can be reused::
-
-    sage: bkpts_rep_with_len_4 = make_rep_bkpts_with_len_n(4, 3, bkpts_rep_with_len_3)
-    sage: len(bkpts_rep_with_len_4)
-    329
-    """
-    # Matthias has suggested looking at a directed tree.
-    # An alternative approach would be to look into using a (graded) lattice as a data structure.
-    # We have bkpt \leq bkpt' if and only if dim(NNC(bkpt)) \leq dim(NNC(bkpt'))
-    # and embed(NNC(bkpt), dim(NNC(bkpt')) \leq NNC(bkpt') in the poset of NNC polyhedra.
-    # This might speed up/less the load of verifying unquiness of cells which is the time bounding task here.
+# This version removed logging code and documentation; for examining memory profile of code actually important. 
+@profile    
+def make_rep_bkpts_with_len_n_profile_edition(n, k=1, bkpts=None, backend=None):
     new_bkpts = []
     if n < 2:
         raise ValueError("n>=2")
     if k == n and bkpts is not None:
-        minimal_funciton_cell_description_logger.warning(f"Initial inputs suggest that the bkpts provided are already correct. Returning the initial bkpts.")
         return bkpts
     if k == n and bkpts is None:
         raise ValueError("k<n")
@@ -56,10 +37,8 @@ def make_rep_bkpts_with_len_n(n, k=1, bkpts=None, backend=None):
     new_bkpts = unique_list(new_bkpts)
     k += 1
     if k == n:
-        minimal_funciton_cell_description_logger.info(f"Breakpoints of length {n} have been generated.")
         return new_bkpts
     else:
-        minimal_funciton_cell_description_logger.info(f"Breakpoints of length {k} have been generated. Now generating breakpoints of length {k+1}.")
         return make_rep_bkpts_with_len_n(n, k, new_bkpts, backend)
         
-seven_bkpts = make_rep_bkpts_with_len_n(7, 6, six_bkpts, "pplite")
+seven_bkpts = make_rep_bkpts_with_len_n_profile_edition(7, 6, six_bkpts, "pplite")
